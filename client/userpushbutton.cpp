@@ -1,8 +1,8 @@
 #include <userpushbutton.h>
 
 /*
- * Этот класс реализует кнопку, способную хранить дополнительную информацию о некотором пользователе
- * Используется в пуле чатов
+ * This class implements a button capable of storing additional information about a particular user
+ * Used in the pool of chats
  */
 
 UserPushButton::UserPushButton(qlonglong id, QString name, bool group, QWidget *parent) {
