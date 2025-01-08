@@ -3,8 +3,8 @@
 using namespace std;
 
 /*
- * Этот класс обеспечивает сохранение токенов авторизации в файлах
- * Инстанция этого класса создаётся лишь в AuthorizationManager
+ * This class handles the storage of authorization tokens in files
+ * An instance of this class is only created within AuthorizationManager
  */
 
 FileManager::FileManager() {
