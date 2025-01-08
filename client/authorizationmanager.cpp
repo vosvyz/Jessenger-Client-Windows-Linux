@@ -3,9 +3,9 @@
 using namespace std;
 
 /*
- * Этот класс отвечает за хранение JWT-токенов в RAM и их обработку
- * Хранение токенов в оперативной памяти позволяет не обращаться к файлу с токеном при каждом запросе к серверу
- * Инстанция AuthorizationManager создается лишь в NetworkClient
+ * This class is responsible for storing JWT tokens in RAM and processing them
+ * Storing tokens in memory allows us to avoid accessing the token file with each server request
+ * An instance of AuthorizationManager is only created within NetworkClient
  */
 
 AuthorizationManager::AuthorizationManager() {
@@ -36,7 +36,7 @@ bool AuthorizationManager::isAccessTokenExpired() {
     QJsonDocument payloadAsJsonDocument = QJsonDocument::fromJson(payloadAsByteArray);
     QJsonObject payload = payloadAsJsonDocument.object();
     int exp = payload["exp"].toInt();
-    return exp < QDateTime::currentDateTimeUtc().toMSecsSinceEpoch(); // токены выдаются по UTC+0, поэтому проверять их актуальность следует по этому же поясу
+    return exp < QDateTime::currentDateTimeUtc().toMSecsSinceEpoch(); // Tokens are issued at UTC+0, so their validity should also be checked according to this time zone.
 }
 
 bool AuthorizationManager::isRefreshTokenExpired() {
@@ -45,7 +45,7 @@ bool AuthorizationManager::isRefreshTokenExpired() {
     QJsonDocument payloadAsJsonDocument = QJsonDocument::fromJson(payloadAsByteArray);
     QJsonObject payload = payloadAsJsonDocument.object();
     int exp = payload["exp"].toInt();
-    return exp < QDateTime::currentDateTimeUtc().toMSecsSinceEpoch(); // токены выдаются по UTC+0, поэтому проверять их актуальность следует по этому же поясу
+    return exp < QDateTime::currentDateTimeUtc().toMSecsSinceEpoch(); // Tokens are issued at UTC+0, so their validity should also be checked according to this time zone.
 }
 
 QString AuthorizationManager::getTokenPayload(QString token) {
@@ -69,7 +69,7 @@ QString AuthorizationManager::getTokenPayload(QString token) {
     return payload;
 }
 
-// Вызывается во время запуска приложения
+// Called during app initialization
 void AuthorizationManager::setBothTokensFromFile() {
     accessToken = fileManager->getAccessToken();
     refreshToken = fileManager->getRefreshToken();
