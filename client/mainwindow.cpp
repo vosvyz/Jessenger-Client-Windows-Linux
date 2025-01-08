@@ -7,7 +7,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
-    // Инициализация свойств
+    // Properties initialization
     ui->setupUi(this);
     ui->chatsContainer->setLayout(ui->chats);
     ui->messagesContainer->setLayout(ui->messages);
@@ -18,7 +18,7 @@ MainWindow::MainWindow(QWidget *parent)
     fullyLoadedChats = new QVector<qlonglong>();
     networkClientThread = new QThread();
     yourChats = new QVector<UserPushButton*>();
-    // Соединение сигналов и слотов (вызов обязательно должен быть раньше запуска потока ниже, так как для корректного запуска приложения должен сработать сигнал networkClientThread->started())
+    // Connecting signals and slots (the call must necessarily occur before starting the thread below, since for the correct launch of the application, the signal networkClientThread->started() must be triggered)
     connectSignals();
     networkClient->moveToThread(networkClientThread);
     networkClientThread->start();
@@ -139,7 +139,7 @@ void MainWindow::start() {
     emit checkRefreshToken();
 }
 
-// Вызывается при открытии чата по нажатии UserPushButton
+// Triggered when opening a chat upon clicking the UserPushButton
 void MainWindow::openChatSlot() {
     QObject *senderObject = sender();
     UserPushButton *button = qobject_cast<UserPushButton*>(senderObject);
@@ -270,7 +270,7 @@ void MainWindow::httpSignProcessed() {
 void MainWindow::getDialogueMessagesProcessed(QJsonArray result, qlonglong chatId, bool shouldScrollDown) {
     int initialHeightOfMessages = ui->messagesContainer->height();
     if (result.size() < 20) {
-        // Логика, связанная с кэшем -- TODO
+        // Caching logic - TODO. I know that after this code some things can go wrong, but caching should fix it
         fullyLoadedChats->append(chatId);
     }
     if (chatId != currentChatId || isCurrentChatGroup) {
@@ -322,7 +322,7 @@ void MainWindow::getDialogueMessagesProcessed(QJsonArray result, qlonglong chatI
 void MainWindow::getGroupMessagesProcessed(QJsonArray result, qlonglong chatId, bool shouldScrollDown) {
     int initialHeightOfMessages = ui->messagesContainer->height();
     if (result.size() < 20) {
-        // Логика, связанная с кэшем -- TODO
+        // Caching logic - TODO. I know that after this code some things can go wrong, but caching should fix it
         fullyLoadedChats->append(chatId);
     }
     if (chatId != currentChatId || !isCurrentChatGroup) {
@@ -383,15 +383,15 @@ QLabel* MainWindow::createStyledLabel(const QString &text, const QString &style)
     return label;
 }
 
-// Получение сообщения по протоколу WebSocket
+// Receiving message by WS-protocol
 void MainWindow::messageReceived(QJsonObject data) {
     QDateTime correctTime = QDateTime::currentDateTime();
     QString timeAsString = correctTime.toString("dd.MM.yy, hh:mm");
     bool toGroup = data["toGroup"].toBool();
     QString senderName = data["senderName"].toString();
     QString initialText = data["messageText"].toString();
-    QString chatText; // < Содержит текст для вывода сообщения в качестве последнего на QVBoxLayoyt с чатами
-    QString identifyBy; // < Содержит параметр (имя пользователя/группы), по которому нужно идентифицировать чат, из которого пришло сообщение для обновления его в ui->chats
+    QString chatText; // < Contains text for displaying the message as the last one in the QVBoxLayout with chats
+    QString identifyBy; // < Contains a parameter (username/group name) by which the chat needs to be identified, from which the message came, in order to update it in ui->chats
     if (!toGroup) {
         identifyBy = senderName;
         if (senderName == currentChatName) {
@@ -416,7 +416,7 @@ void MainWindow::messageReceived(QJsonObject data) {
             ui->messages->addWidget(finalContainer);
         }
         else {
-            // Создать уведомление
+            // Create a notification
         }
         chatText = senderName + ": " + initialText.left(30);
         if (initialText.size() > 30) {
@@ -448,7 +448,7 @@ void MainWindow::messageReceived(QJsonObject data) {
             ui->messages->addWidget(finalContainer);
         }
         else {
-            // Создать уведомление
+            // Create a notification
         }
         chatText = senderName + ": " + initialText.left(30);
         if (initialText.size() > 30) {
@@ -496,7 +496,7 @@ void MainWindow::messageReceived(QJsonObject data) {
     }
 }
 
-// Отправка сообщения в диалог/группу. Отправляется по WebSocket, а не HTTP, вследствии архитектуры сервера
+// Sending a message to a dialog/group. Sent via WebSocket rather than HTTP due to the server architecture.
 void MainWindow::on_sendMessageButton_clicked()
 {
     QString text = ui->messageLineEdit->text();
@@ -525,20 +525,20 @@ void MainWindow::on_sendMessageButton_clicked()
     int timeLabelWidth = metrics.horizontalAdvance(timeLabel->text());
     finalContainer->setMinimumWidth(qMax(300, timeLabelWidth));
     ui->messages->addWidget(finalContainer);
-    QString message = "{\"method\": \"create\", "; // < Сообщение серверу
+    QString message = "{\"method\": \"create\", "; // < Message to the server
     if (!isCurrentChatGroup) {
         message += "\"toGroup\": false, ";
     }
     else {
         message += "\"toGroup\": true, ";
     }
-    message += "\"chatId\": " + QString::number(currentChatId) + ", \"messageText\": \"" + text + "\", "; // Закрывать фигурную скобку не надо, networkManager должен пришить сообщению временный id
+    message += "\"chatId\": " + QString::number(currentChatId) + ", \"messageText\": \"" + text + "\", "; // Do not close the curly brace, networkManager should attach a temporary ID to the message
     emit sendMessage(message);
     QTimer::singleShot(100, this, [=]() {
         QScrollBar *bar = ui->messagesScrollArea->verticalScrollBar();
         bar->setValue(bar->maximum());
     });
-    QString chatText = "You: " + text.left(30); // < для вывода себе же на QVBoxLayout с чатами
+    QString chatText = "You: " + text.left(30); // < for displaying to oneself on the QVBoxLayout with chats
     if (text.size() > 30) {
         chatText += "...";
     }
