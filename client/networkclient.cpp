@@ -1,10 +1,10 @@
 #include <networkclient.h>
 
 /*
- * Этот класс отвечает за общение с сервером`
+ * This class provides interaction with the server
  */
 
-NetworkClient::NetworkClient(QObject *parent) : QObject(parent)  { // Пустой конструктор нужен для создания объекта перед помещением его в поток. Свойства инициализируются в initialized() уже вне GUI-потока
+NetworkClient::NetworkClient(QObject *parent) : QObject(parent)  { // An empty constructor is needed to create the object before placing it into the thread. Properties are initialized in initialized() outside the GUI thread
 
 }
 
@@ -30,8 +30,8 @@ void NetworkClient::initialize() {
 
 void NetworkClient::webSocketMessageReceivedSlot(const QString &message) {
     QJsonObject data = QJsonDocument::fromJson(message.toUtf8()).object();
-    if (data["method"] == "acknowledged") { // acknowledged устанавливается при получении и обработке сервером сообщения
-        QString tempId = data["tempId"].toString(); // < временный id сообщения
+    if (data["method"] == "acknowledged") { // Acknowledged is set when the server receives and processes the message
+        QString tempId = data["tempId"].toString(); // < temp ID for the message
         for (int i = 0; i < pendingWsMessages->size(); ++i) {
             WsMessage *current = pendingWsMessages->at(i);
             if (current->getTempId() == tempId) {
@@ -58,7 +58,7 @@ void NetworkClient::sendPendingWsMessages() {
     }
 }
 
-// Вызывается при установлении соединения с сервером
+// Called when a connection to the server is established.
 void NetworkClient::webSocketConnectedSlot() {
     webSocketConnecting = false;
     webSocketConnected = true;
@@ -98,7 +98,7 @@ void NetworkClient::webSocketDisconnected() {
     }
 }
 
-// Параметр "path" принимает "sign/in" или "sign/up"
+// The "path" parameter accepts either "sign/in" or "sign/up".
 void NetworkClient::sign(QMap<QString, QString> body, QString path) {
     QEventLoop *eventLoop = new QEventLoop();
     QNetworkRequest request = createHttpRequest(path);
@@ -115,10 +115,10 @@ void NetworkClient::sign(QMap<QString, QString> body, QString path) {
         emit httpSignError(path, "Wrong password!");
     }
     else if (status == 404) {
-        emit httpSignError(path, "User not found!"); // По соглашению, сервер отправляет 404 при попытке входа по email, к которому не привязан ни один аккаунт
+        emit httpSignError(path, "User not found!"); // By convention, the server sends a 404 response when attempting to log in with an email address that isn't associated with any account
     }
     else if (status == 409) {
-        emit httpSignError(path, "User already exists!"); // По соглашению, сервер отправляет 409 при попытке регистрации по имени или email, ассоциированному с кем-то
+        emit httpSignError(path, "User already exists!"); // By convention, the server sends a 409 response when attempting to register using a username or email already associated with someone else
     }
     else {
         QByteArray dataAsArray = reply->readAll();
@@ -129,7 +129,7 @@ void NetworkClient::sign(QMap<QString, QString> body, QString path) {
     }
 }
 
-// Условия валидации refresh-токена те же, что и у refresh(), помимо того, что в этом методе проверяется, не истёк ли токен. Вызывается при инициализации
+// The conditions for validating the refresh token are the same as in the refresh() method, except that this method also checks whether the token has expired. Called during initialization
 void NetworkClient::checkRefreshToken() {
     QEventLoop *eventLoop = new QEventLoop();
     QMap<QString, QString> body;
@@ -259,9 +259,11 @@ void NetworkClient::getGroupMessages(QMap<QString, QString> body) {
 }
 
 /*
- / Условия валидации refresh-токена те же, что и у checkRefreshToken(), помимо того, что не проверяется срок жизни токена -- иначе пользователя с корректным, но истекшим токеном
- / может разлогинить прямо во время сеанса. Этот метод вызывает UnauthorizedSignal только при некорректности токена. Вызывается в течение работы программы
-*/
+ * The conditions for validating the refresh token are the same as in the checkRefreshToken() method,
+ * except that the token's expiration date is not checked—otherwise, a user with a valid but expired token
+ * could be logged out right in the middle of a session. This method triggers the UnauthorizedSignal only
+ * if the token is invalid. Called during program execution
+ */
 bool NetworkClient::refresh(QMap<QString, QString> body) {
     QEventLoop *eventLoop = new QEventLoop();
     QNetworkRequest request = createHttpRequest("sign/refresh");
