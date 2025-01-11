@@ -388,13 +388,14 @@ void MainWindow::messageReceived(QJsonObject data) {
     QDateTime correctTime = QDateTime::currentDateTime();
     QString timeAsString = correctTime.toString("dd.MM.yy, hh:mm");
     bool toGroup = data["toGroup"].toBool();
+    qlonglong chatId = data["chatId"].toVariant().toLongLong();
     QString senderName = data["senderName"].toString();
     QString initialText = data["messageText"].toString();
     QString chatText; // < Contains text for displaying the message as the last one in the QVBoxLayout with chats
     QString identifyBy; // < Contains a parameter (username/group name) by which the chat needs to be identified, from which the message came, in order to update it in ui->chats
     if (!toGroup) {
         identifyBy = senderName;
-        if (senderName == currentChatName || (senderName == "You" && data["otherId"] == currentChatId && !isCurrentChatGroup)) {
+        if (senderName == currentChatName || (senderName == "You" && chatId == currentChatId && !isCurrentChatGroup)) {
             QWidget *finalContainer = new QWidget();
             QString backgroundColor = (senderName == "You")
                                           ? "background-color: rgb(62, 105, 120);"
@@ -484,10 +485,10 @@ void MainWindow::messageReceived(QJsonObject data) {
         }
     }
     if (!alreadyAtThisChat) {
-        UserPushButton *button = new UserPushButton(currentChatId, currentChatName, isCurrentChatGroup, this);
+        UserPushButton *button = new UserPushButton(chatId, identifyBy, toGroup, this);
         QLabel *nameLabel = new QLabel(button);
         nameLabel->setStyleSheet("border: none;");
-        nameLabel->setText(currentChatName);
+        nameLabel->setText(identifyBy);
         nameLabel->setGeometry(10, 10, 580, 40);
         QLabel *lastMessageLabel = new QLabel(button);
         lastMessageLabel->setObjectName("lastMessageLabel");
