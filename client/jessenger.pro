@@ -8,20 +8,22 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    authorizationfilemanager.cpp \
+    cachefilemanager.cpp \
     messagewidget.cpp \
     userpushbutton.cpp \
     authorizationmanager.cpp \
-    filemanager.cpp \
     main.cpp \
     mainwindow.cpp \
     networkclient.cpp \
     wsmessage.cpp
 
 HEADERS += \
+    authorizationfilemanager.h \
+    cachefilemanager.h \
     messagewidget.h \
     userpushbutton.h \
     authorizationmanager.h \
-    filemanager.h \
     mainwindow.h \
     networkclient.h \
     wsmessage.h

@@ -4,7 +4,7 @@
 #include <ctime>
 #include <QDebug>
 #include <QJsonObject>
-#include <filemanager.h>
+#include <authorizationfilemanager.h>
 #include <QJsonDocument>
 
 using namespace std;
@@ -25,7 +25,7 @@ public:
 private:
     QString accessToken;
     QString refreshToken;
-    FileManager *fileManager;
+    AuthorizationFileManager *fileManager;
 };
 
 #endif // TOKENMANAGERH_H

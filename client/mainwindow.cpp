@@ -447,8 +447,10 @@ void MainWindow::messageReceived(QJsonObject data) {
             QLabel *timeLabel = createStyledLabel(timeAsString,
                                                   "font: 14pt \"Segoe UI\"; color: rgb(180, 180, 180);");
             messageLabel->setMaximumWidth(800);
-            QLabel *senderNameLabel = createStyledLabel(senderName, "color: rgb(51, 124, 192); font: 14pt \"Segoe UI\";");
-            layout->addWidget(senderNameLabel);
+            if (senderName != "You") {
+                QLabel *senderNameLabel = createStyledLabel(senderName, "color: rgb(51, 124, 192); font: 14pt \"Segoe UI\";");
+                layout->addWidget(senderNameLabel);
+            }
             layout->addWidget(messageLabel);
             layout->addWidget(timeLabel);
             ui->messages->addWidget(finalContainer);

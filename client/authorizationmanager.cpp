@@ -9,7 +9,7 @@ using namespace std;
  */
 
 AuthorizationManager::AuthorizationManager() {
-    fileManager = new FileManager();
+    fileManager = new AuthorizationFileManager();
     setBothTokensFromFile();
 }
 
