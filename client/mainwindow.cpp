@@ -82,6 +82,22 @@ void MainWindow::clearMessages() {
     }
 }
 
+void MainWindow::insertChat(UserPushButton *button) {
+    int index = 0;
+    int count = ui->chats->count();
+    while (index < count) {
+        QWidget* widget = ui->chats->itemAt(index)->widget();
+        if (widget) {
+            UserPushButton* currentButton = dynamic_cast<UserPushButton*>(widget);
+            if (currentButton && currentButton->getLastMessageTime() <= button->getLastMessageTime()) {
+                break;
+            }
+        }
+        ++index;
+    }
+    ui->chats->insertWidget(index, button);
+}
+
 void MainWindow::messagesScrolled(int value) {
     if (value > 300) {
         return ;
@@ -188,7 +204,7 @@ void MainWindow::unauthorizedSignal() {
 
 void MainWindow::createGroupProcessed(QJsonObject object) {
     QString name = object["name"].toString();
-    UserPushButton *button = new UserPushButton(object["id"].toVariant().toLongLong(), object["name"].toString(), true);
+    UserPushButton *button = new UserPushButton(object["id"].toVariant().toLongLong(), object["name"].toString(), 0, true);
     QLabel *nameLabel = new QLabel(button);
     QLabel *lastMessageLabel = new QLabel(button);
     lastMessageLabel->setObjectName("lastMessageLabel");
@@ -219,7 +235,7 @@ void MainWindow::findChatsProcessed(QJsonArray result) {
             qlonglong id = object["id"].toVariant().toLongLong();
             QString name = object["name"].toString();
             bool isGroup = object["group"].toBool();
-            UserPushButton *button = new UserPushButton(id, name, isGroup, this);
+            UserPushButton *button = new UserPushButton(id, name, isGroup, 0, this);
             configureChatButton(button, 40);
             button->setText(name);
             ui->chats->addWidget(button);
@@ -231,10 +247,11 @@ void MainWindow::getYourChatsProcessed(QJsonArray result) {
     for (int i = 0; i < result.size(); ++i) {
         int neededHeight = 60;
         QJsonObject object = result[i].toObject();
-        QDateTime correctTime = (QDateTime::fromMSecsSinceEpoch(object["lastMessageTime"].toVariant().toLongLong(), Qt::UTC)).toLocalTime();
+        qlonglong msecs = object["lastMessageTime"].toVariant().toLongLong();
+        QDateTime correctTime = (QDateTime::fromMSecsSinceEpoch(msecs, Qt::UTC)).toLocalTime();
         QString lastMessage = object["lastMessageText"].toString();
         QString name = object["chatName"].toString();
-        UserPushButton *button = new UserPushButton(object["chatId"].toVariant().toLongLong(), name, object["group"].toBool(), this);
+        UserPushButton *button = new UserPushButton(object["chatId"].toVariant().toLongLong(), name, object["group"].toBool(), msecs, this);
         QLabel *nameLabel = new QLabel(button);
         QLabel *lastMessageLabel = new QLabel(button);
         lastMessageLabel->setObjectName("lastMessageLabel");
@@ -260,6 +277,16 @@ void MainWindow::getYourChatsProcessed(QJsonArray result) {
             ui->chats->addWidget(button);
         }
     }
+}
+
+void MainWindow::insertButtonToYourChatsList(UserPushButton* button) {
+    auto it = std::lower_bound(
+        yourChats->begin(), yourChats->end(), button,
+        [](UserPushButton* a, UserPushButton* b) {
+            return a->getLastMessageTime() > b->getLastMessageTime();
+        }
+    );
+    yourChats->insert(std::distance(yourChats->begin(), it), button);
 }
 
 void MainWindow::httpSignProcessed() {
@@ -394,7 +421,12 @@ void MainWindow::messageReceived(QJsonObject data) {
     QString chatText; // < Contains text for displaying the message as the last one in the QVBoxLayout with chats
     QString identifyBy; // < Contains a parameter (username/group name) by which the chat needs to be identified, from which the message came, in order to update it in ui->chats
     if (!toGroup) {
-        identifyBy = senderName;
+        if (senderName == "You") {
+            identifyBy = data["chatName"].toString();
+        }
+        else {
+            identifyBy = senderName;
+        }
         if (senderName == currentChatName || (senderName == "You" && chatId == currentChatId && !isCurrentChatGroup)) {
             QWidget *finalContainer = new QWidget();
             QString backgroundColor = (senderName == "You")
@@ -468,27 +500,29 @@ void MainWindow::messageReceived(QJsonObject data) {
     if (!ui->findUserLineEdit->text().isEmpty()) {
         return ;
     }
+    qlonglong msecs = data["time"].toVariant().toLongLong();
     bool alreadyAtThisChat = false;
     for (int i = 0; i < yourChats->length(); ++i) {
         UserPushButton *current = yourChats->at(i);
         if (current->getName() == identifyBy) {
             alreadyAtThisChat = true;
+            current->setLastMessageTime(msecs);
             current->setFixedHeight(130);
             current->findChild<QLabel*>("lastMessageLabel")->setText(chatText);
-            yourChats->push_back(current);
+            insertButtonToYourChatsList(current);
             yourChats->remove(i);
             if (ui->findUserLineEdit->text().isEmpty()) {
                 ui->chats->removeWidget(current);
-                ui->chats->insertWidget(0, current);
+                insertChat(current);
             }
             break;
         }
     }
     if (!alreadyAtThisChat) {
-        UserPushButton *button = new UserPushButton(chatId, identifyBy, toGroup, this);
+        UserPushButton *button = new UserPushButton(chatId, identifyBy, toGroup, msecs, this);
         QLabel *nameLabel = new QLabel(button);
         nameLabel->setStyleSheet("border: none;");
-        nameLabel->setText(identifyBy);
+        nameLabel->setText(senderName);
         nameLabel->setGeometry(10, 10, 580, 40);
         QLabel *lastMessageLabel = new QLabel(button);
         lastMessageLabel->setObjectName("lastMessageLabel");
@@ -499,7 +533,7 @@ void MainWindow::messageReceived(QJsonObject data) {
         lastMessageLabel->setGeometry(10, 60, 580, 60);
         configureChatButton(button, 130);
         if (ui->findUserLineEdit->text().isEmpty()) {
-            ui->chats->insertWidget(0, button);
+            insertChat(button);
         }
         yourChats->append(button);
     }
@@ -553,10 +587,13 @@ void MainWindow::on_sendMessageButton_clicked()
     }
     chatText += "\n" + timeAsString;
     bool alreadyAtThisChat = false;
+    QDateTime utcDateTime = QDateTime::currentDateTimeUtc();
+    qlonglong msecs = utcDateTime.toMSecsSinceEpoch();
     for (int i = 0; i < yourChats->length(); ++i) {
         UserPushButton *current = yourChats->at(i);
         if (current->getName() == currentChatName) {
             alreadyAtThisChat = true;
+            current->setLastMessageTime(msecs);
             current->setFixedHeight(130);
             current->findChild<QLabel*>("lastMessageLabel")->setText(chatText);
             yourChats->push_back(current);
@@ -569,7 +606,7 @@ void MainWindow::on_sendMessageButton_clicked()
         }
     }
     if (!alreadyAtThisChat) {
-        UserPushButton *button = new UserPushButton(currentChatId, currentChatName, isCurrentChatGroup, this);
+        UserPushButton *button = new UserPushButton(currentChatId, currentChatName, isCurrentChatGroup, msecs, this);
         QLabel *nameLabel = new QLabel(button);
         nameLabel->setStyleSheet("border: none;");
         nameLabel->setText(currentChatName);

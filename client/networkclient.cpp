@@ -46,9 +46,9 @@ void NetworkClient::webSocketMessageReceivedSlot(const QString &message) {
 }
 
 void NetworkClient::sendPendingWsMessages() {
+    QDateTime utcDateTime = QDateTime::currentDateTimeUtc();
+    qlonglong msecs = utcDateTime.toMSecsSinceEpoch();
     for (int i = 0; i < pendingWsMessages->size(); ++i) {
-        QDateTime utcDateTime = QDateTime::currentDateTimeUtc();
-        qlonglong msecs = utcDateTime.toMSecsSinceEpoch();
         WsMessage *current = pendingWsMessages->at(i);
         if (current->getCreatedAt() + 10000 < msecs) {
             if (webSocketConnected) {

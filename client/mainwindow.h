@@ -40,6 +40,26 @@ signals:
     void getDialogueMessages(QMap<QString, QString> body);
     void sign(QMap<QString, QString> body, QString path);
 
+private:
+    void insertButtonToYourChatsList(UserPushButton* button);
+    void insertChat(UserPushButton *button);
+    QLabel* createStyledLabel(const QString &text, const QString &style);
+    QVector <qlonglong> *fullyLoadedChats;
+    QVector<UserPushButton*> *yourChats;
+    void connectSignals();
+    void configureChatButton(UserPushButton *button, int neededHeight);
+    void setHomePage();
+    Ui::MainWindow *ui;
+    bool isCurrentChatGroup;
+    qlonglong currentChatId;
+    QString currentChatName;
+    NetworkClient *networkClient;
+    QThread *networkClientThread;
+    QStackedWidget *stackedWidget;
+    void clearMessages();
+    void clearChats();
+    void setPageByName(const QString& pageName);
+
 private slots:
     void findChatsProcessed(QJsonArray result);
     void httpSignProcessed();
@@ -66,23 +86,5 @@ private slots:
     void on_toCreateGroupPageButton_clicked();
     void on_createGroupGoBackButton_clicked();
     void on_messageLineEdit_returnPressed();
-
-private:
-    QLabel* createStyledLabel(const QString &text, const QString &style);
-    QVector <qlonglong> *fullyLoadedChats;
-    QVector<UserPushButton*> *yourChats;
-    void connectSignals();
-    void configureChatButton(UserPushButton *button, int neededHeight);
-    void setHomePage();
-    Ui::MainWindow *ui;
-    bool isCurrentChatGroup;
-    qlonglong currentChatId;
-    QString currentChatName;
-    NetworkClient *networkClient;
-    QThread *networkClientThread;
-    QStackedWidget *stackedWidget;
-    void clearMessages();
-    void clearChats();
-    void setPageByName(const QString& pageName);
 };
 #endif // MAINWINDOW_H
