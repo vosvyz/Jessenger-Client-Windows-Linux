@@ -394,13 +394,16 @@ void MainWindow::messageReceived(QJsonObject data) {
     QString identifyBy; // < Contains a parameter (username/group name) by which the chat needs to be identified, from which the message came, in order to update it in ui->chats
     if (!toGroup) {
         identifyBy = senderName;
-        if (senderName == currentChatName) {
+        if (senderName == currentChatName || (senderName == "You" && data["otherId"] == currentChatId && !isCurrentChatGroup)) {
             QWidget *finalContainer = new QWidget();
+            QString backgroundColor = (senderName == "You")
+                                          ? "background-color: rgb(62, 105, 120);"
+                                          : "background-color: rgb(61, 59, 61);";
             finalContainer->setMaximumWidth(800);
             finalContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
             finalContainer->setStyleSheet("font: 16pt \"Segoe UI\";"
                                           "border-radius: 3px;"
-                                          "background-color: rgb(61, 59, 61);");
+                                          + backgroundColor);
             QVBoxLayout *layout = new QVBoxLayout(finalContainer);
             layout->setContentsMargins(5, 5, 5, 5);
             QLabel *messageLabel = createStyledLabel(initialText, "");
@@ -429,11 +432,14 @@ void MainWindow::messageReceived(QJsonObject data) {
         identifyBy = groupName;
         if (groupName == currentChatName) {
             QWidget *finalContainer = new QWidget();
+            QString backgroundColor = (senderName == "You")
+                                          ? "background-color: rgb(62, 105, 120);"
+                                          : "background-color: rgb(61, 59, 61);";
             finalContainer->setMaximumWidth(800);
             finalContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
             finalContainer->setStyleSheet("font: 16pt \"Segoe UI\";"
                                           "border-radius: 3px;"
-                                          "background-color: rgb(61, 59, 61);");
+                                          + backgroundColor);
             QVBoxLayout *layout = new QVBoxLayout(finalContainer);
             layout->setContentsMargins(5, 5, 5, 5);
             QLabel *messageLabel = createStyledLabel(initialText, "");
