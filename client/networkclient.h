@@ -1,5 +1,4 @@
-#ifndef NETWORKCLIENT_H
-#define NETWORKCLIENT_H
+#pragma once
 
 #include <QVector>
 #include <QUrl>
@@ -31,6 +30,7 @@ public:
     ~NetworkClient();
 
 signals:
+    void shouldConfirmEmailSignal();
     void httpSignProcessed();
     void createGroupProcessed(QJsonObject object);
     void createGroupError(QString error);
@@ -79,5 +79,3 @@ private slots:
     void webSocketConnectedSlot();
     void webSocketDisconnected();
 };
-
-#endif // NETWORKCLIENT_H

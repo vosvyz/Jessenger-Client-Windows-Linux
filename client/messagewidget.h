@@ -1,5 +1,4 @@
-#ifndef MESSAGEWIDGET_H
-#define MESSAGEWIDGET_H
+#pragma once
 
 #include <QFrame>
 
@@ -14,5 +13,3 @@ public:
 private:
     qlonglong id;
 };
-
-#endif // MESSAGEWIDGET_H

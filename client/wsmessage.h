@@ -1,5 +1,4 @@
-#ifndef WSMESSAGE_H
-#define WSMESSAGE_H
+#pragma once
 
 #include <QString>
 
@@ -14,5 +13,3 @@ private:
     QString tempId;
     QString message;
 };
-
-#endif // WSMESSAGE_H

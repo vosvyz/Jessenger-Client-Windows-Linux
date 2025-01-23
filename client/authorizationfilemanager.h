@@ -1,5 +1,4 @@
-#ifndef AUTHORIZATIONFILEMANAGER_H
-#define AUTHORIZATIONFILEMANAGER_H
+#pragma once
 
 #include <QFile>
 #include <QDir>
@@ -19,5 +18,3 @@ private:
     QFile *accessTokenFile;
     QFile *refreshTokenFile;
 };
-
-#endif // AUTHORIZATIONFILEMANAGER_H
