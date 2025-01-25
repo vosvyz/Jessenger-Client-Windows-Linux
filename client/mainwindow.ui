@@ -52,7 +52,7 @@ color: rgb(224, 255, 255);</string>
      </rect>
     </property>
     <property name="currentIndex">
-     <number>4</number>
+     <number>1</number>
     </property>
     <widget class="QWidget" name="signPage">
      <widget class="QFrame" name="signWrap">
@@ -748,7 +748,7 @@ border: none;</string>
        </font>
       </property>
       <property name="text">
-       <string>We sent you link to your e-mail. Click it to sign in. It will get expired in 5 minutes.</string>
+       <string>We sent you a link to your e-mail. Click it to sign in. It will get expired in 5 minutes.</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>

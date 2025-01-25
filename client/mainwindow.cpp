@@ -9,7 +9,6 @@ MainWindow::MainWindow(QWidget *parent)
 {
     // Properties initialization
     ui->setupUi(this);
-    setWindowFlag(Qt::FramelessWindowHint);
     ui->chatsContainer->setLayout(ui->chats);
     ui->messagesContainer->setLayout(ui->messages);
     stackedWidget = ui->stackedWidget;
@@ -142,8 +141,8 @@ void MainWindow::setPageByName(const QString& pageName) {
 }
 
 void MainWindow::shouldConfirmEmailSlot() {
-    emailConfirmTokenExpiredTimer->start();
     setPageByName("confirmEmailPage");
+    emailConfirmTokenExpiredTimer->start();
 }
 
 void MainWindow::start() {
@@ -194,7 +193,7 @@ void MainWindow::httpSignError(QString requestPath, QString error) {
 }
 
 void MainWindow::emailConfirmTokenExpired() {
-    setPageByName("signInFormPage");
+    setPageByName(chosenTypeOfLogin);
 }
 
 void MainWindow::unauthorizedSignal() {
@@ -279,6 +278,7 @@ void MainWindow::getYourChatsProcessed(QJsonArray result) {
 
 void MainWindow::httpSignProcessed() {
     setHomePage();
+    emailConfirmTokenExpiredTimer->stop();
     emit connectWebSocket();
 }
 
@@ -655,11 +655,13 @@ void MainWindow::on_messageLineEdit_returnPressed()
 
 void MainWindow::on_toSignInButton_clicked()
 {
+    chosenTypeOfLogin = "signInFormPage";
     setPageByName("signInFormPage");
 }
 
 void MainWindow::on_toSignUpButton_clicked()
 {
+    chosenTypeOfLogin = "signUpFormPage";
     setPageByName("signUpFormPage");
 }
 

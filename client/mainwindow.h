@@ -67,10 +67,10 @@ private slots:
     void on_createGroupGoBackButton_clicked();
     void on_messageLineEdit_returnPressed();
     void emailConfirmTokenExpired();
-
     void on_backToSignInButton_clicked();
 
 private:
+    QString chosenTypeOfLogin;
     QTimer* emailConfirmTokenExpiredTimer;
     QLabel* createStyledLabel(const QString &text, const QString &style);
     QVector <qlonglong> *fullyLoadedChats;

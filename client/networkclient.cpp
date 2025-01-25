@@ -100,43 +100,60 @@ void NetworkClient::webSocketDisconnected() {
 
 // The "path" parameter accepts either "sign/in" or "sign/up".
 void NetworkClient::sign(QMap<QString, QString> body, QString path) {
-    QByteArray dataAsArray;
     QNetworkRequest request = createHttpRequest(path);
     QNetworkReply *reply = networkManager->post(request, formContent(body));
-    QObject::connect(reply, &QNetworkReply::metaDataChanged, this, [this, path, body, reply]() {
-        if (reply != nullptr) {
-            if (reply->error() == QNetworkReply::HostNotFoundError || reply->error() == QNetworkReply::ConnectionRefusedError) {
-                sign(body, path);
-                return ;
+    auto success = QSharedPointer<bool>::create(false);
+    auto statusChecked = QSharedPointer<bool>::create(false);
+    auto dataAsArray = QSharedPointer<QByteArray>::create(QByteArray());
+    QObject::connect(reply, &QNetworkReply::readyRead, this, [success, statusChecked, dataAsArray, reply, this, path]() {
+        if (!*statusChecked) {
+            *statusChecked = true;
+            QString status = QString::fromUtf8(reply->readAll()).simplified();
+            status.replace("data:", "");
+            if (status == "Not Found") {
+                emit httpSignError(path, "User not found!");
+                return;
             }
-            int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-            if (status == 403) {
+            else if (status == "Forbidden") {
                 emit httpSignError(path, "Wrong password!");
-                return ;
+                return;
             }
-            else if (status == 404) {
-                emit httpSignError(path, "User not found!"); // By convention, the server sends a 404 response when attempting to log in with an email address that isn't associated with any account
-                return ;
+            else if (status == "Conflict") {
+                emit httpSignError(path, "User already exists!");
+                return;
             }
-            else if (status == 409) {
-                emit httpSignError(path, "User already exists!"); // By convention, the server sends a 409 response when attempting to register using a username or email already associated with someone else
-                return ;
+            else if (status == "Unprocessable entity") {
+                emit httpSignError(path, "Something's wrong, retry");
+                return;
             }
             else {
+                *success = true;
                 emit shouldConfirmEmailSignal();
             }
         }
+        else {
+            dataAsArray->append(reply->readAll());
+        }
     });
-    QObject::connect(reply, &QNetworkReply::readyRead, this, [&dataAsArray, reply]() {
-        dataAsArray.append(reply->readAll());
-    });
-    QObject::connect(reply, &QNetworkReply::finished, this, [dataAsArray, this]() {
-        QJsonDocument dataAsDocument = QJsonDocument::fromJson(dataAsArray);
-        QJsonObject data = dataAsDocument.object();
-        authorizationManager->setBothTokens(data["access"].toString(), data["refresh"].toString());
-        emit httpSignProcessed();
+    QObject::connect(reply, &QNetworkReply::finished, this, [body, path, success, dataAsArray, reply, this]() {
+        if (reply->error() == QNetworkReply::HostNotFoundError || reply->error() == QNetworkReply::ConnectionRefusedError) {
+            emit httpSignError(path, "We are experiencing some issues on our server... please wait.");
+            sign(body, path);
+            return ;
+        }
+        if (*success) {
+            QByteArray nonPointerData = *dataAsArray;
+            nonPointerData = nonPointerData.replace("data:", "");
+            nonPointerData = nonPointerData.simplified();
+            QJsonDocument dataAsDocument = QJsonDocument::fromJson(nonPointerData);
+            QJsonObject data = dataAsDocument.object();
+            authorizationManager->setBothTokens(data["access"].toString(), data["refresh"].toString());
+            emit httpSignProcessed();
+        }
+        reply->deleteLater();
     });
 }
+
 
 // The conditions for validating the refresh token are the same as in the refresh() method, except that this method also checks whether the token has expired. Called during initialization
 void NetworkClient::checkRefreshToken() {
