@@ -6,13 +6,17 @@ Jessenger is fast application that doesn't uses extra headers, parameters and bl
 ## Functionality
 Functionality of this application is pure. This messenger had been developed by a schoolarship as a learning project so it hasn't all the features found in larger apps. I plan to add following things:
 
-  - Caching (The server supports this feature, but the client doesn't)
+  - Caching
 
   - Files
 
   - Displaying videos, GIFs, images etc
 
   - Profile customization
+
+  - Improve UX/UI design (working on it)
+
+  - Increase security by encrypting the cache with the user's secret key
 
 ## Technologies
   - C++
