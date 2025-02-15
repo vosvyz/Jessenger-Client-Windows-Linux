@@ -1,5 +1,4 @@
-#ifndef TOKENMANAGERH_H
-#define TOKENMANAGERH_H
+#pragma once
 
 #include <ctime>
 #include <QDebug>
@@ -28,4 +27,3 @@ private:
     AuthorizationFileManager *fileManager;
 };
 
-#endif // TOKENMANAGERH_H
