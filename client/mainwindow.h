@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cmath>
 #include <QDebug>
 #include <QLabel>
+#include <QMovie>
 #include <QThread>
 #include <QScrollBar>
 #include <stdexcept>
@@ -48,7 +50,7 @@ private slots:
     void getGroupMessagesProcessed(QJsonArray result, qlonglong chatId, bool shouldScrollDown);
     void getYourChatsProcessed(QJsonArray result);
     void getDialogueMessagesProcessed(QJsonArray result, qlonglong chatId, bool shouldScrollDown);
-    void httpSignError(QString requestPath, QString error);
+    void httpSignError(QString error);
     void openChatSlot();
     void unauthorizedSignal();
     void socketConnected();
@@ -70,6 +72,7 @@ private slots:
     void on_backToSignInButton_clicked();
 
 private:
+    int calculateLineCount(const QString& text, const QFontMetrics& metrics, int labelWidth);
     QString chosenTypeOfLogin;
     QTimer* emailConfirmTokenExpiredTimer;
     QLabel* createStyledLabel(const QString &text, const QString &style);

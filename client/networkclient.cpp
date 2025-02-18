@@ -111,19 +111,19 @@ void NetworkClient::sign(QMap<QString, QString> body, QString path) {
             QString status = QString::fromUtf8(reply->readAll()).simplified();
             status.replace("data:", "");
             if (status == "Not Found") {
-                emit httpSignError(path, "User not found!");
+                emit httpSignError("User not found!");
                 return;
             }
             else if (status == "Forbidden") {
-                emit httpSignError(path, "Wrong password!");
+                emit httpSignError("Wrong password!");
                 return;
             }
             else if (status == "Conflict") {
-                emit httpSignError(path, "User already exists!");
+                emit httpSignError("User already exists!");
                 return;
             }
-            else if (status == "Unprocessable entity") {
-                emit httpSignError(path, "Something's wrong, retry");
+            else if (status == "Unprocessable Entity") {
+                emit httpSignError("Something went wrong, try again!");
                 return;
             }
             else {
@@ -137,7 +137,7 @@ void NetworkClient::sign(QMap<QString, QString> body, QString path) {
     });
     QObject::connect(reply, &QNetworkReply::finished, this, [body, path, success, dataAsArray, reply, this]() {
         if (reply->error() == QNetworkReply::HostNotFoundError || reply->error() == QNetworkReply::ConnectionRefusedError) {
-            emit httpSignError(path, "We are experiencing some issues on our server... please wait.");
+            emit httpSignError("We are experiencing some issues on our server!");
             sign(body, path);
             return ;
         }

@@ -9,6 +9,11 @@ MainWindow::MainWindow(QWidget *parent)
 {
     // Properties initialization
     ui->setupUi(this);
+    QMovie *movie = new QMovie("assets/signing.gif");
+    ui->signInWaitingLabel->setMovie(movie);
+    ui->signInWaitingLabel->hide();
+    ui->signUpWaitingLabel->setMovie(movie);
+    ui->signUpWaitingLabel->hide();
     ui->chatsContainer->setLayout(ui->chats);
     ui->messagesContainer->setLayout(ui->messages);
     stackedWidget = ui->stackedWidget;
@@ -26,6 +31,7 @@ MainWindow::MainWindow(QWidget *parent)
     networkClient->moveToThread(networkClientThread);
     networkClientThread->start();
     qApp->setStyleSheet("QLabel {selection-background-color: rgb(46, 112, 165);}");
+    setPageByName("waitingPage");
 }
 
 void MainWindow::connectSignals() {
@@ -142,6 +148,16 @@ void MainWindow::setPageByName(const QString& pageName) {
 
 void MainWindow::shouldConfirmEmailSlot() {
     setPageByName("confirmEmailPage");
+    if (chosenTypeOfLogin == "sign in") {
+        ui->signInButton->setEnabled(false);
+        ui->signInWaitingLabel->movie()->stop();
+        ui->signInWaitingLabel->hide();
+    }
+    if (chosenTypeOfLogin == "sign up") {
+        ui->signUpButton->setEnabled(false);
+        ui->signUpWaitingLabel->movie()->stop();
+        ui->signUpWaitingLabel->hide();
+    }
     emailConfirmTokenExpiredTimer->start();
 }
 
@@ -173,6 +189,21 @@ void MainWindow::openChatSlot() {
     clearMessages();
 }
 
+int MainWindow::calculateLineCount(const QString& text, const QFontMetrics& metrics, int labelWidth) {
+   QStringList words = text.split(' ');
+   int lineCount = 1;
+   QString currentLine;
+   for (const QString& word : words) {
+       if (metrics.horizontalAdvance(currentLine + (currentLine.isEmpty() ? "" : " ") + word) > labelWidth) {
+           ++lineCount;
+           currentLine = word;
+       } else {
+           currentLine += (currentLine.isEmpty() ? "" : " ") + word;
+       }
+   }
+   return lineCount;
+}
+
 void MainWindow::socketDisconnected() {
     ui->connectionStatement->setText("Connecting...");
 }
@@ -181,19 +212,48 @@ void MainWindow::socketConnected() {
     ui->connectionStatement->setText("You are online!");
 }
 
-void MainWindow::httpSignError(QString requestPath, QString error) {
-    if (requestPath == "sign/in") {
-        ui->signInFormWrap->setGeometry(810, 410, 300, 260);
+void MainWindow::httpSignError(QString error) {
+    if (chosenTypeOfLogin == "sign in") {
+        ui->signInButton->setEnabled(true);
+        ui->signInWaitingLabel->hide();
+        ui->signInWaitingLabel->movie()->stop();
         ui->signInWarning->setText(error);
+        QFontMetrics metrics(ui->signInWarning->font());
+        int lines = calculateLineCount(ui->signInWarning->text(), metrics, 300);
+        ui->signInFormWrap->setGeometry(810, 430 - (20 * lines), 300, 200 + (40 * lines));
+        ui->signInWaitingLabel->move(860, 230 - (20 * lines));
     }
-    if (requestPath == "sign/up") {
-        ui->signUpFormWrap->setGeometry(800, 385, 320, 310);
+    if (chosenTypeOfLogin == "sign up") {
+        ui->signUpButton->setEnabled(true);
+        ui->signUpWaitingLabel->hide();
+        ui->signUpWaitingLabel->movie()->stop();
         ui->signUpWarning->setText(error);
+        QFontMetrics metrics(ui->signUpWarning->font());
+        int lines = calculateLineCount(ui->signUpWarning->text(), metrics, 300);
+        ui->signUpFormWrap->setGeometry(810, 405 - (20 * lines), 300, 250 + (40 * lines));
+        ui->signUpWaitingLabel->move(860, 200 - (20 * lines));
     }
 }
 
 void MainWindow::emailConfirmTokenExpired() {
-    setPageByName(chosenTypeOfLogin);
+    if (chosenTypeOfLogin == "sign in") {
+        ui->signInButton->setEnabled(true);
+        ui->signInWarning->setText("You didn't verify your email!");
+        QFontMetrics metrics(ui->signInWarning->font());
+        int lines = calculateLineCount(ui->signInWarning->text(), metrics, 300);
+        ui->signInFormWrap->setGeometry(810, 430 - (20 * lines), 300, 200 + (40 * lines));
+        ui->signInWaitingLabel->move(860, 230 - (20 * lines));
+        setPageByName("signInFormPage");
+    }
+    if (chosenTypeOfLogin == "sign up") {
+        ui->signUpButton->setEnabled(true);
+        ui->signUpWarning->setText("You didn't verify your email!");
+        QFontMetrics metrics(ui->signUpWarning->font());
+        int lines = calculateLineCount(ui->signUpWarning->text(), metrics, 300);
+        ui->signUpFormWrap->setGeometry(810, 405 - (20 * lines), 300, 250 + (40 * lines));
+        ui->signUpWaitingLabel->move(860, 200 - (20 * lines));
+        setPageByName("signUpFormPage");
+    }
 }
 
 void MainWindow::unauthorizedSignal() {
@@ -242,42 +302,45 @@ void MainWindow::findChatsProcessed(QJsonArray result) {
 }
 
 void MainWindow::getYourChatsProcessed(QJsonArray result) {
-    for (int i = 0; i < result.size(); ++i) {
-        int neededHeight = 60;
-        QJsonObject object = result[i].toObject();
-        QDateTime correctTime = (QDateTime::fromMSecsSinceEpoch(object["lastMessageTime"].toVariant().toLongLong(), Qt::UTC)).toLocalTime();
-        QString lastMessage = object["lastMessageText"].toString();
-        QString name = object["chatName"].toString();
-        UserPushButton *button = new UserPushButton(object["chatId"].toVariant().toLongLong(), name, object["group"].toBool(), this);
-        QLabel *nameLabel = new QLabel(button);
-        QLabel *lastMessageLabel = new QLabel(button);
-        lastMessageLabel->setObjectName("lastMessageLabel");
-        lastMessageLabel->setStyleSheet("font: 14pt \"Segoe UI\";"
-                                        "color: rgb(180, 180, 180);"
-                                        "border: none;");
-        lastMessageLabel->setGeometry(10, 60, 580, 60);
-        nameLabel->setStyleSheet("border: none;");
-        nameLabel->setText(name);
-        nameLabel->setGeometry(10, 10, 580, 40);
-        if (!lastMessage.isEmpty()) {
-            QString lastMessageInfo = object["lastMessageSenderName"].toString() + ": " + lastMessage.left(30);
-            if (lastMessage.size() > 30) {
-                lastMessageInfo += "...";
+    if (ui->findUserLineEdit->text().isEmpty()) {
+        for (int i = 0; i < result.size(); ++i) {
+            int neededHeight = 60;
+            QJsonObject object = result[i].toObject();
+            QDateTime correctTime = (QDateTime::fromMSecsSinceEpoch(object["lastMessageTime"].toVariant().toLongLong(), Qt::UTC)).toLocalTime();
+            QString lastMessage = object["lastMessageText"].toString();
+            QString name = object["chatName"].toString();
+            UserPushButton *button = new UserPushButton(object["chatId"].toVariant().toLongLong(), name, object["group"].toBool(), this);
+            QLabel *nameLabel = new QLabel(button);
+            QLabel *lastMessageLabel = new QLabel(button);
+            lastMessageLabel->setObjectName("lastMessageLabel");
+            lastMessageLabel->setStyleSheet("font: 14pt \"Segoe UI\";"
+                                            "color: rgb(180, 180, 180);"
+                                            "border: none;");
+            lastMessageLabel->setGeometry(10, 60, 580, 60);
+            nameLabel->setStyleSheet("border: none;");
+            nameLabel->setText(name);
+            nameLabel->setGeometry(10, 10, 580, 40);
+            if (!lastMessage.isEmpty()) {
+                QString lastMessageInfo = object["lastMessageSenderName"].toString() + ": " + lastMessage.left(30);
+                if (lastMessage.size() > 30) {
+                    lastMessageInfo += "...";
+                }
+                lastMessageInfo += "\n" + correctTime.toString("dd.MM.yy, hh:mm");
+                lastMessageLabel->setText(lastMessageInfo);
+                neededHeight = 130;
             }
-            lastMessageInfo += "\n" + correctTime.toString("dd.MM.yy, hh:mm");
-            lastMessageLabel->setText(lastMessageInfo);
-            neededHeight = 130;
-        }
-        configureChatButton(button, neededHeight);
-        yourChats->append(button);
-        if (ui->findUserLineEdit->text().isEmpty()) {
-            ui->chats->addWidget(button);
+            configureChatButton(button, neededHeight);
+            yourChats->append(button);
+            if (ui->findUserLineEdit->text().isEmpty()) {
+                ui->chats->addWidget(button);
+            }
         }
     }
 }
 
 void MainWindow::httpSignProcessed() {
     setHomePage();
+
     emailConfirmTokenExpiredTimer->stop();
     emit connectWebSocket();
 }
@@ -655,25 +718,30 @@ void MainWindow::on_messageLineEdit_returnPressed()
 
 void MainWindow::on_toSignInButton_clicked()
 {
-    chosenTypeOfLogin = "signInFormPage";
     setPageByName("signInFormPage");
 }
 
 void MainWindow::on_toSignUpButton_clicked()
 {
-    chosenTypeOfLogin = "signUpFormPage";
     setPageByName("signUpFormPage");
 }
 
 void MainWindow::on_signInButton_clicked()
 {
+    ui->signInButton->setEnabled(false);
+    chosenTypeOfLogin = "sign in";
     QString email = ui->signInEmailLineEdit->text();
     QString password = ui->signInPasswordLineEdit->text();
     if (email.isEmpty() || password.isEmpty()) {
-        ui->signInFormWrap->setGeometry(810, 410, 300, 260);
         ui->signInWarning->setText("Fields are empty!");
+        QFontMetrics metrics(ui->signInWarning->font());
+        int lines = calculateLineCount(ui->signInWarning->text(), metrics, 300);
+        ui->signInFormWrap->setGeometry(810, 430 - (20 * lines), 300, 200 + (40 * lines));
+        ui->signInWaitingLabel->move(860, 230 - (20 * lines));
         return ;
     }
+    ui->signInWaitingLabel->show();
+    ui->signInWaitingLabel->movie()->start();
     QMap<QString, QString> body;
     body.insert("email", email);
     body.insert("password", password);
@@ -682,24 +750,37 @@ void MainWindow::on_signInButton_clicked()
 
 void MainWindow::on_signUpButton_clicked()
 {
+    ui->signUpButton->setEnabled(false);
+    chosenTypeOfLogin = "sign up";
     QString name = ui->signUpUsernameLineEdit->text();
     QString email = ui->signUpEmailLineEdit->text();
     QString password = ui->signUpPasswordLineEdit->text();
     if (name.isEmpty() || email.isEmpty() || password.isEmpty()) {
-        ui->signUpFormWrap->setGeometry(800, 385, 320, 310);
         ui->signUpWarning->setText("Fields are empty!");
+        QFontMetrics metrics(ui->signUpWarning->font());
+        int lines = calculateLineCount(ui->signUpWarning->text(), metrics, 300);
+        ui->signUpFormWrap->setGeometry(810, 405 - (20 * lines), 300, 250 + (40 * lines));
+        ui->signUpWaitingLabel->move(860, 200 - (20 * lines)); // I know that it's better to make a frame, yeah-yeeeah
         return ;
     }
     if (name.length() > 30) {
-        ui->signUpFormWrap->setGeometry(800, 385, 320, 310);
         ui->signUpWarning->setText("Too long name!");
+        QFontMetrics metrics(ui->signUpWarning->font());
+        int lines = calculateLineCount(ui->signUpWarning->text(), metrics, 300);
+        ui->signUpFormWrap->setGeometry(810, 405 - (20 * lines), 300, 250 + (40 * lines));
+        ui->signUpWaitingLabel->move(860, 200 - (20 * lines));
         return ;
     }
     if (name == "You") {
-        ui->signUpFormWrap->setGeometry(800, 385, 320, 310);
         ui->signUpWarning->setText("Sorry, this name is reserved!");
+        QFontMetrics metrics(ui->signUpWarning->font());
+        int lines = calculateLineCount(ui->signUpWarning->text(), metrics, 300);
+        ui->signUpFormWrap->setGeometry(810, 405 - (20 * lines), 300, 250 + (40 * lines));
+        ui->signUpWaitingLabel->move(860, 200 - (20 * lines));
         return ;
     }
+    ui->signUpWaitingLabel->show();
+    ui->signUpWaitingLabel->movie()->start();
     QMap<QString, QString> body;
     body.insert("name", name);
     body.insert("email", email);
@@ -709,6 +790,5 @@ void MainWindow::on_signUpButton_clicked()
 
 void MainWindow::on_backToSignInButton_clicked()
 {
-    setPageByName("signInFormPage");
+    setPageByName(chosenTypeOfLogin);
 }
-

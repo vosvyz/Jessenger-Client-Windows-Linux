@@ -38,7 +38,7 @@ signals:
     void findChatsProcessed(QJsonArray result);
     void getYourChatsProcessed(QJsonArray result);
     void getDialogueMessagesProcessed(QJsonArray result, qlonglong chatId, bool shouldScrollDown);
-    void httpSignError(QString requestPath, QString error);
+    void httpSignError(QString error);
     void unauthorizedSignal();
     void initialized();
     void webSocketConnectedSignal();

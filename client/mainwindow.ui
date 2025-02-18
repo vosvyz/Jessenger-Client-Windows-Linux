@@ -52,7 +52,7 @@ color: rgb(224, 255, 255);</string>
      </rect>
     </property>
     <property name="currentIndex">
-     <number>1</number>
+     <number>2</number>
     </property>
     <widget class="QWidget" name="signPage">
      <widget class="QFrame" name="signWrap">
@@ -276,7 +276,7 @@ border-radius: 3px;
          <x>0</x>
          <y>210</y>
          <width>300</width>
-         <height>40</height>
+         <height>200</height>
         </rect>
        </property>
        <property name="font">
@@ -291,9 +291,28 @@ border-radius: 3px;
         <string/>
        </property>
        <property name="alignment">
-        <set>Qt::AlignCenter</set>
+        <set>Qt::AlignHCenter|Qt::AlignTop</set>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
        </property>
       </widget>
+     </widget>
+     <widget class="QLabel" name="signInWaitingLabel">
+      <property name="geometry">
+       <rect>
+        <x>860</x>
+        <y>230</y>
+        <width>200</width>
+        <height>200</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
      </widget>
     </widget>
     <widget class="QWidget" name="signUpFormPage">
@@ -445,7 +464,7 @@ border-radius: 3px;
          <x>0</x>
          <y>260</y>
          <width>300</width>
-         <height>40</height>
+         <height>200</height>
         </rect>
        </property>
        <property name="font">
@@ -460,9 +479,28 @@ border-radius: 3px;
         <string/>
        </property>
        <property name="alignment">
-        <set>Qt::AlignCenter</set>
+        <set>Qt::AlignHCenter|Qt::AlignTop</set>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
        </property>
       </widget>
+     </widget>
+     <widget class="QLabel" name="signUpWaitingLabel">
+      <property name="geometry">
+       <rect>
+        <x>860</x>
+        <y>200</y>
+        <width>200</width>
+        <height>200</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
      </widget>
     </widget>
     <widget class="QWidget" name="homePage">
@@ -733,13 +771,13 @@ border: none;</string>
      </widget>
     </widget>
     <widget class="QWidget" name="confirmEmailPage">
-     <widget class="QLabel" name="confirmEmailLabel">
+     <widget class="QLabel" name="confirmEmailPictureLabel">
       <property name="geometry">
        <rect>
-        <x>0</x>
-        <y>0</y>
-        <width>1920</width>
-        <height>1080</height>
+        <x>675</x>
+        <y>225</y>
+        <width>570</width>
+        <height>480</height>
        </rect>
       </property>
       <property name="font">
@@ -747,8 +785,17 @@ border: none;</string>
         <pointsize>72</pointsize>
        </font>
       </property>
+      <property name="focusPolicy">
+       <enum>Qt::NoFocus</enum>
+      </property>
       <property name="text">
-       <string>We sent you a link to your e-mail. Click it to sign in. It will get expired in 5 minutes.</string>
+       <string/>
+      </property>
+      <property name="pixmap">
+       <pixmap>../build-jessenger-Desktop_Qt_5_15_2_MinGW_64_bit-Debug/assets/confirm_email.svg</pixmap>
+      </property>
+      <property name="scaledContents">
+       <bool>true</bool>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
@@ -780,6 +827,30 @@ border: none;</string>
       </property>
       <property name="text">
        <string>←</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="confirmEmailTextLabel">
+      <property name="geometry">
+       <rect>
+        <x>610</x>
+        <y>710</y>
+        <width>700</width>
+        <height>150</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <pointsize>24</pointsize>
+       </font>
+      </property>
+      <property name="text">
+       <string>Now we need to check your email. Please follow the instructions in the letter.</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <property name="wordWrap">
+       <bool>true</bool>
       </property>
      </widget>
     </widget>
@@ -931,22 +1002,22 @@ border: none;
      </widget>
     </widget>
     <widget class="QWidget" name="waitingPage">
-     <widget class="QLabel" name="waitPleaseLabel">
+     <widget class="QLabel" name="waitingLabel">
       <property name="geometry">
        <rect>
-        <x>0</x>
-        <y>0</y>
-        <width>1920</width>
-        <height>1080</height>
+        <x>800</x>
+        <y>510</y>
+        <width>320</width>
+        <height>60</height>
        </rect>
       </property>
       <property name="font">
        <font>
-        <pointsize>72</pointsize>
+        <pointsize>24</pointsize>
        </font>
       </property>
       <property name="text">
-       <string>It seems like our server is offline! Keep waiting, please, we're working on it.</string>
+       <string>Initializing...</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
