@@ -20,6 +20,7 @@ MainWindow::MainWindow(QWidget *parent)
     stackedWidget = ui->stackedWidget;
     ui->chats->setAlignment(Qt::AlignTop);
     ui->messages->setAlignment(Qt::AlignTop);
+    setPageByName("waitingPage");
     networkClient = new NetworkClient();
     fullyLoadedChats = new QVector<qlonglong>();
     networkClientThread = new QThread();
@@ -32,7 +33,6 @@ MainWindow::MainWindow(QWidget *parent)
     networkClient->moveToThread(networkClientThread);
     networkClientThread->start();
     qApp->setStyleSheet("QLabel {selection-background-color: rgb(46, 112, 165);}");
-    setPageByName("waitingPage");
 }
 
 void MainWindow::connectSignals() {
