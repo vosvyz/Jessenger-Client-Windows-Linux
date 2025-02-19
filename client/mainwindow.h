@@ -14,6 +14,7 @@
 #include <networkclient.h>
 #include <userpushbutton.h>
 #include <messagewidget.h>
+#include <messagecachemanager.h>
 
 using namespace std;
 
@@ -48,7 +49,7 @@ private slots:
     void createGroupProcessed(QJsonObject object);
     void createGroupError(QString error);
     void getGroupMessagesProcessed(QJsonArray result, qlonglong chatId, bool shouldScrollDown);
-    void getYourChatsProcessed(QJsonArray result);
+    void showChats(QJsonArray result);
     void getDialogueMessagesProcessed(QJsonArray result, qlonglong chatId, bool shouldScrollDown);
     void httpSignError(QString error);
     void openChatSlot();
@@ -72,6 +73,7 @@ private slots:
     void on_backToSignInButton_clicked();
 
 private:
+    MessageCacheManager *messageCacheManager;
     int calculateLineCount(const QString& text, const QFontMetrics& metrics, int labelWidth);
     QString chosenTypeOfLogin;
     QTimer* emailConfirmTokenExpiredTimer;

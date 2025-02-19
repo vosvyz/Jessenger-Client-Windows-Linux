@@ -10,6 +10,7 @@ MainWindow::MainWindow(QWidget *parent)
     // Properties initialization
     ui->setupUi(this);
     QMovie *movie = new QMovie("assets/signing.gif");
+    messageCacheManager = new MessageCacheManager();
     ui->signInWaitingLabel->setMovie(movie);
     ui->signInWaitingLabel->hide();
     ui->signUpWaitingLabel->setMovie(movie);
@@ -55,7 +56,7 @@ void MainWindow::connectSignals() {
     QObject::connect(networkClient, &NetworkClient::findChatsProcessed, this, &MainWindow::findChatsProcessed);
     QObject::connect(networkClient, &NetworkClient::getDialogueMessagesProcessed, this, &MainWindow::getDialogueMessagesProcessed);
     QObject::connect(networkClient, &NetworkClient::getGroupMessagesProcessed, this, &MainWindow::getGroupMessagesProcessed);
-    QObject::connect(networkClient, &NetworkClient::getYourChatsProcessed, this, &MainWindow::getYourChatsProcessed);
+    QObject::connect(networkClient, &NetworkClient::getYourChatsProcessed, this, &MainWindow::showChats);
     QObject::connect(networkClient, &NetworkClient::httpSignProcessed, this, &MainWindow::httpSignProcessed);
     QObject::connect(networkClient, &NetworkClient::webSocketMessageReceived, this, &MainWindow::messageReceived);
     QObject::connect(networkClient, &NetworkClient::webSocketConnectedSignal, this, &MainWindow::socketConnected);
@@ -134,6 +135,8 @@ void MainWindow::configureChatButton(UserPushButton *button, int neededHeight) {
 
 void MainWindow::setHomePage() {
     setPageByName("homePage");
+    emailConfirmTokenExpiredTimer->stop();
+    emit connectWebSocket();
     emit getYourChats();
 }
 
@@ -209,6 +212,7 @@ void MainWindow::socketDisconnected() {
 }
 
 void MainWindow::socketConnected() {
+    fullyLoadedChats->clear(); // during the offline period user could get some messages
     ui->connectionStatement->setText("You are online!");
 }
 
@@ -301,11 +305,12 @@ void MainWindow::findChatsProcessed(QJsonArray result) {
     }
 }
 
-void MainWindow::getYourChatsProcessed(QJsonArray result) {
+void MainWindow::showChats(QJsonArray result) {
     if (ui->findUserLineEdit->text().isEmpty()) {
         for (int i = 0; i < result.size(); ++i) {
             int neededHeight = 60;
             QJsonObject object = result[i].toObject();
+            messageCacheManager->createChatAssociation(object["chatId"].toVariant(), object["chatName"].toVariant(), object["group"].toVariant());
             QDateTime correctTime = (QDateTime::fromMSecsSinceEpoch(object["lastMessageTime"].toVariant().toLongLong(), Qt::UTC)).toLocalTime();
             QString lastMessage = object["lastMessageText"].toString();
             QString name = object["chatName"].toString();
@@ -340,9 +345,6 @@ void MainWindow::getYourChatsProcessed(QJsonArray result) {
 
 void MainWindow::httpSignProcessed() {
     setHomePage();
-
-    emailConfirmTokenExpiredTimer->stop();
-    emit connectWebSocket();
 }
 
 void MainWindow::getDialogueMessagesProcessed(QJsonArray result, qlonglong chatId, bool shouldScrollDown) {
@@ -356,6 +358,7 @@ void MainWindow::getDialogueMessagesProcessed(QJsonArray result, qlonglong chatI
     }
     for (int i = 0; i < result.size(); ++i) {
         QJsonObject object = result[i].toObject();
+        messageCacheManager->createMessage(object, QVariant::fromValue(chatId), QVariant::fromValue(false));
         QString sender = object["senderName"].toString();
         bool areYouSender = (sender == "You");
         QString backgroundColor = areYouSender
@@ -408,6 +411,7 @@ void MainWindow::getGroupMessagesProcessed(QJsonArray result, qlonglong chatId, 
     }
     for (int i = 0; i < result.size(); ++i) {
         QJsonObject object = result[i].toObject();
+        messageCacheManager->createMessage(object, chatId, true);
         QString sender = object["senderName"].toString();
         bool areYouSender = (sender == "You");
         QString message = object["text"].toString();
@@ -471,6 +475,7 @@ void MainWindow::messageReceived(QJsonObject data) {
     QString initialText = data["messageText"].toString();
     QString chatText; // < Contains text for displaying the message as the last one in the QVBoxLayout with chats
     QString identifyBy; // < Contains a parameter (username/group name) by which the chat needs to be identified, from which the message came, in order to update it in ui->chats
+    messageCacheManager->createMessage(data, chatId, toGroup);
     if (!toGroup) {
         identifyBy = senderName;
         if (senderName == currentChatName || (senderName == "You" && chatId == currentChatId && !isCurrentChatGroup)) {

@@ -1,4 +1,4 @@
-QT       += core gui network websockets
+QT       += core gui network websockets sql
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++17
@@ -9,7 +9,7 @@ CONFIG += c++17
 
 SOURCES += \
     authorizationfilemanager.cpp \
-    cachefilemanager.cpp \
+    messagecachemanager.cpp \
     messagewidget.cpp \
     userpushbutton.cpp \
     authorizationmanager.cpp \
@@ -20,7 +20,7 @@ SOURCES += \
 
 HEADERS += \
     authorizationfilemanager.h \
-    cachefilemanager.h \
+    messagecachemanager.h \
     messagewidget.h \
     userpushbutton.h \
     authorizationmanager.h \
