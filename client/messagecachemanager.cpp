@@ -46,7 +46,7 @@ void MessageCacheManager::createMessage(QJsonObject data, QVariant chatId, QVari
 QJsonArray MessageCacheManager::getChatsWithLastMessageAsArray() {
     db.open();
     QJsonArray result;
-    queryExecutor.exec("SELECT messages.*, ca.name AS name FROM messages JOIN chat_associations ca ON ca.id = messages.chat_id AND ca.is_group = 1 WHERE messages.id IN (SELECT MAX(id) FROM messages GROUP BY messages.group, messages.chat_id);");
+    queryExecutor.exec("SELECT messages.*, ca.chat_name AS name FROM messages JOIN chat_associations ca ON ca.chat_id = messages.chat_id AND ca.is_group = 1 WHERE messages.id IN (SELECT MAX(id) FROM messages GROUP BY messages.to_group, messages.chat_id);");
     while (queryExecutor.next()) {
         QJsonObject jsonObject;
         for (int i = 0; i < queryExecutor.record().count(); ++i) {
