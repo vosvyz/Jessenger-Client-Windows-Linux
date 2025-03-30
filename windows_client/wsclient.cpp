@@ -14,9 +14,9 @@ void WsClient::initialize() {
 }
 
 void WsClient::connectSignals() {
-    QObject::connect(socket, QWebSocket::textMessageReceived, this, WsClient::messageReceived);
-    QObject::connect(socket, QWebSocket::stateChanged, this, WsClient::socketStateChanged);
-    QObject::connect(resendPendingMessagesTimer, QTimer::timeout, this, WsClient::resendPendingMessages);
+    QObject::connect(socket, &QWebSocket::textMessageReceived, this, &WsClient::messageReceived);
+    QObject::connect(socket, &QWebSocket::stateChanged, this, &WsClient::socketStateChanged);
+    QObject::connect(resendPendingMessagesTimer, &QTimer::timeout, this, &WsClient::resendPendingMessages);
 }
 
 void WsClient::socketStateChanged(QAbstractSocket::SocketState state) {
