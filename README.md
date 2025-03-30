@@ -1,4 +1,4 @@
-# Client of the Jessenger app for Windows
+# Client of the Jessenger app for Windows And Linux (Tested at Manjaro)
 ## Jessenger is...
 a little lightweight messenger that can be used as a basis for similar projects. Initially developed as an educational project
 ## Performance
