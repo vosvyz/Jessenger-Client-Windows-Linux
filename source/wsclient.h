@@ -13,10 +13,11 @@ class WsClient : public NetworkClient
 public:
     WsClient();
 signals:
-    void messageAcknowledged(QJsonObject data);
     void socketConnected();
     void socketDisconnected();
     void messageReceived(QJsonObject data);
+    void createMessageAcknowledged(QJsonObject data);
+    void messageError(QJsonObject data);
 public slots:
     void initialize();
     void sendMessage(QJsonObject messageData);
@@ -28,6 +29,7 @@ private:
     QAbstractSocket::SocketState socketState;
     void connect();
     void connectSignals();
+    void removePendingMessage(qlonglong tempId);
     QWebSocket *socket;
     QTimer *resendPendingMessagesTimer;
     QVector<QJsonObject> pendingMessages;

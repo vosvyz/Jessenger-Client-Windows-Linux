@@ -5,9 +5,11 @@
 #include <QDebug>
 #include <QRandomGenerator>
 #include <QMap>
+#include "editmessagemenu.h"
 #include "messagewidget.h"
 #include "chatpushbutton.h"
 #include <QThread>
+#include <QSharedPointer>
 #include <QMovie>
 #include <QJsonObject>
 #include <QMainWindow>
@@ -42,12 +44,16 @@ signals:
     void getMessages(QString endpoint, QMap<QString, QString> body);
 
 private slots:
+    void hideEditMessageMenu();
+    void editMessageClicked();
+    void deleteMessageClicked();
+    void messageRightClicked();
     void createGroupError(QString error);
     void groupCreated(QJsonObject data);
     void messagesScrolled(int value);
     void openChat();
     void messageReceived(QJsonObject data);
-    void messageAcknowledged(QJsonObject data);
+    void createMessageAcknowledged(QJsonObject data);
     void wsConnected();
     void wsDisconnected();
     void on_goToSignInButton_clicked();
@@ -62,24 +68,21 @@ private slots:
     void confirmEmailExpired();
     void showChats(QJsonObject data);
     void showMessages(QJsonObject data);
-
     void on_fromSignInToSignUpButton_clicked();
-
     void on_fromSignUpToSignInButton_clicked();
-
     void on_findUserLineEdit_textEdited(const QString &arg1);
-
     void on_sendMessageButton_clicked();
-
     void on_messageLineEdit_returnPressed();
-
     void on_goToCreateGroupPageButton_clicked();
-
     void on_createGroupButton_clicked();
-
     void on_createGroupGoBackButton_clicked();
 
+    void on_cancelMessageEditButton_clicked();
+
 private:
+    QString messageOperationMode;
+    QPointer<MessageWidget> editedMessage;
+    EditMessageMenu* editMessageMenu;
     Ui::MainWindow *ui;
     QThread networkThread; // This thread contains both HttpClient and WsClient. The shared thread is needed to synchronize some job of these classes
     RamTokenStorage *ramTokenStorage;
@@ -93,16 +96,21 @@ private:
     QString currentChatName;
     bool isCurrentChatGroup;
     QVector<ChatPushButton*> yourChats;
-    QMap<QString, int> pageNameToIndexMap;
     QFont basicFont; // The most usual font for this application -- Segoe UI, 16pt.
     void displayCreateGroupWarning(QString warning);
     void clearChats();
     void clearMessages();
     void connectSignals();
-    void addMessage(QJsonObject data);
-    void updateChatsWithMessage(qlonglong chatId, QString chatName, bool group, QString fullText); // fullText format is "sender: message\ntime"
+    QString createLastMessageInfo(QString text, QString sender, qlonglong time);
+    ChatPushButton* createChatPushButton(qlonglong chatId, QString chatName, bool isChatGroup, qlonglong lastMessageId = 0,
+                                         QString lastMessageText = "", QString lastMessageSender = "", qlonglong lastMessageTime = 0);
+    MessageWidget* createMessageWidget(qlonglong id, QString text, QString sender, qlonglong time, bool isTemp);
+    ChatPushButton* findChatButton(qlonglong chatId, bool group);
+    void updateChatsWithCreateMessage(qlonglong chatId, QString chatName, bool group, qlonglong messageId, QString text, QString sender, qlonglong time);
+    void updateChatsWithEditMessage(qlonglong chatId, bool group, qlonglong editedMessageId, QString text);
+    void updateChatsWithDeleteMessage(qlonglong chatId, bool group, qlonglong deletedMessageId,
+                                      qlonglong newMessageId = 0, QString text = "", QString sender = "", qlonglong time = 0);
     void displaySignInWarning(QString warning);
     void displaySignUpWarning(QString warning);
-    void fillPageNameToIndexMap();
     int calculateLineCount(const QString& text, const QFontMetrics& metrics, int labelWidth);
 };

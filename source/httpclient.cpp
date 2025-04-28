@@ -124,7 +124,6 @@ void HttpClient::getUserChats(int failCounter) {
             QByteArray dataAsArray = reply->readAll();
             QJsonDocument dataAsDocument = QJsonDocument::fromJson(dataAsArray);
             QJsonObject data = dataAsDocument.object();
-            data["your chats"] = true;
             emit getUserChatsProcessed(data);
         }
         reply->deleteLater();
@@ -175,7 +174,6 @@ void HttpClient::findChats(QMap<QString, QString> body, int failCounter) {
             QJsonDocument dataAsDocument = QJsonDocument::fromJson(dataAsArray);
             QJsonObject data = dataAsDocument.object();
             data["filter"] = body["filter"];
-            data["your chats"] = false;
             emit findChatsProcessed(data);
         }
         reply->deleteLater();
@@ -226,7 +224,7 @@ void HttpClient::getMessages(QString endpoint, QMap<QString, QString> body, int 
             QJsonDocument dataAsDocument = QJsonDocument::fromJson(dataAsArray);
             QJsonObject data = dataAsDocument.object();
             data["chatId"] = body["chatId"].toLongLong();
-            data["just opened"] = !body.contains("lastMessageId");
+            data["justOpened"] = !body.contains("lastMessageId");
             endpoint.endsWith("dialogue")
                     ? data["group"] = false
                     : data["group"] = true;
@@ -284,6 +282,7 @@ void HttpClient::createGroup(QMap<QString, QString> body, int failCounter) {
                 QByteArray dataAsArray = reply->readAll();
                 QJsonDocument dataAsDocument = QJsonDocument::fromJson(dataAsArray);
                 QJsonObject data = dataAsDocument.object();
+                data["name"] = body["name"];
                 emit createGroupProcessed(data);
             }
         }

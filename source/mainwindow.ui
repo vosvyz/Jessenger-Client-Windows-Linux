@@ -42,7 +42,7 @@ color: rgb(224, 255, 255);</string>
    <bool>false</bool>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QStackedWidget" name="stackedWidget">
+   <widget class="CustomStackedWidget" name="stackedWidget">
     <property name="geometry">
      <rect>
       <x>0</x>
@@ -626,7 +626,7 @@ border-radius: 3px;
         <rect>
          <x>10</x>
          <y>1030</y>
-         <width>1240</width>
+         <width>1241</width>
          <height>40</height>
         </rect>
        </property>
@@ -649,7 +649,7 @@ border-radius: 3px;
       </widget>
       <widget class="QPushButton" name="sendMessageButton">
        <property name="enabled">
-        <bool>false</bool>
+        <bool>true</bool>
        </property>
        <property name="geometry">
         <rect>
@@ -709,10 +709,13 @@ border-radius: 3px;</string>
         <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
        </property>
        <property name="sizeAdjustPolicy">
-        <enum>QAbstractScrollArea::SizeAdjustPolicy::AdjustToContents</enum>
+        <enum>QAbstractScrollArea::SizeAdjustPolicy::AdjustIgnored</enum>
        </property>
        <property name="widgetResizable">
         <bool>true</bool>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
        </property>
        <widget class="QWidget" name="messagesContainer">
         <property name="geometry">
@@ -740,6 +743,34 @@ border-radius: 3px;</string>
         </widget>
        </widget>
       </widget>
+      <widget class="QPushButton" name="cancelMessageEditButton">
+       <property name="enabled">
+        <bool>true</bool>
+       </property>
+       <property name="geometry">
+        <rect>
+         <x>1210</x>
+         <y>1030</y>
+         <width>40</width>
+         <height>40</height>
+        </rect>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>16</pointsize>
+         <strikeout>true</strikeout>
+        </font>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">background-color: rgb(61, 59, 61);
+border-radius: 3px;
+text-decoration: line-through;</string>
+       </property>
+       <property name="text">
+        <string>✎</string>
+       </property>
+      </widget>
+      <zorder>cancelMessageEditButton</zorder>
       <zorder>messageLineEdit</zorder>
       <zorder>currentChatName</zorder>
       <zorder>messagesScrollArea</zorder>
@@ -763,8 +794,14 @@ border-radius: 3px;</string>
       <property name="horizontalScrollBarPolicy">
        <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
       </property>
+      <property name="sizeAdjustPolicy">
+       <enum>QAbstractScrollArea::SizeAdjustPolicy::AdjustIgnored</enum>
+      </property>
       <property name="widgetResizable">
        <bool>true</bool>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
       </property>
       <widget class="QWidget" name="chatsContainer">
        <property name="geometry">
@@ -774,6 +811,12 @@ border-radius: 3px;</string>
          <width>580</width>
          <height>960</height>
         </rect>
+       </property>
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
        </property>
        <widget class="QWidget" name="verticalLayoutWidget">
         <property name="geometry">
@@ -1065,6 +1108,14 @@ border: none;
    </widget>
   </widget>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>CustomStackedWidget</class>
+   <extends>QStackedWidget</extends>
+   <header>customstackedwidget.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

@@ -10,6 +10,9 @@ CONFIG += c++17
 SOURCES += \
     cachingmanager.cpp \
     chatpushbutton.cpp \
+    clickableframe.cpp \
+    customstackedwidget.cpp \
+    editmessagemenu.cpp \
     httpclient.cpp \
     messagewidget.cpp \
     main.cpp \
@@ -22,6 +25,9 @@ SOURCES += \
 HEADERS += \
     cachingmanager.h \
     chatpushbutton.h \
+    clickableframe.h \
+    customstackedwidget.h \
+    editmessagemenu.h \
     httpclient.h \
     messagewidget.h \
     mainwindow.h \
@@ -37,9 +43,6 @@ FORMS += \
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
-
-INCLUDEPATH += "../websocketpp-0.8.2/websocketpp"
-DEPENDPATH += "../websocketpp-0.8.2/websocketpp"
 
 DISTFILES += \
     TODO

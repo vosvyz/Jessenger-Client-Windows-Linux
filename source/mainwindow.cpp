@@ -1,8 +1,6 @@
 #include "mainwindow.h"
 #include <./ui_mainwindow.h>
 
-using namespace std;
-
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -11,12 +9,16 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->chats->setAlignment(Qt::AlignTop);
     ui->messages->setAlignment(Qt::AlignTop);
+
     ui->chatsContainer->setLayout(ui->chats);
     ui->messagesContainer->setLayout(ui->messages);
 
-    connectSignals();
+    messageOperationMode = "create";
+    editMessageMenu = new EditMessageMenu();
+    editMessageMenu->setParent(this);
+    editMessageMenu->hide();
 
-    fillPageNameToIndexMap();
+    connectSignals();
 
     ui->confirmEmailPictureLabel->setPixmap(QPixmap("assets/confirm_email.svg"));
 
@@ -44,8 +46,7 @@ MainWindow::MainWindow(QWidget *parent)
     wsClient.setRamTokenStorage(ramTokenStorage);
     wsClient.moveToThread(&networkThread);
 
-    int homeIndex = pageNameToIndexMap["homePage"];
-    ui->stackedWidget->setCurrentIndex(homeIndex);
+    ui->stackedWidget->setPage("homePage");
 
     // load chats from cache
 }
@@ -71,7 +72,7 @@ void MainWindow::connectSignals()
     QObject::connect(&wsClient, &WsClient::socketConnected, this, &MainWindow::wsConnected);
     QObject::connect(&wsClient, &WsClient::socketDisconnected, this, &MainWindow::wsDisconnected);
     QObject::connect(&wsClient, &WsClient::messageReceived, this, &MainWindow::messageReceived);
-    QObject::connect(&wsClient, &WsClient::messageAcknowledged, this, &MainWindow::messageAcknowledged);
+    QObject::connect(&wsClient, &WsClient::createMessageAcknowledged, this, &MainWindow::createMessageAcknowledged);
     QObject::connect(this, &MainWindow::sendMessage, &wsClient, &WsClient::sendMessage);
 
     QObject::connect(this, &MainWindow::sign, &httpClient, &HttpClient::sign);
@@ -91,19 +92,58 @@ void MainWindow::connectSignals()
     QObject::connect(&httpClient, &HttpClient::getMessagesProcessed, this, &MainWindow::showMessages);
     QObject::connect(&httpClient, &HttpClient::createGroupProcessed, this, &MainWindow::groupCreated);
 
+    QObject::connect(editMessageMenu, &EditMessageMenu::goBackClicked, this, &MainWindow::hideEditMessageMenu);
+    QObject::connect(editMessageMenu, &EditMessageMenu::editClicked, this, &MainWindow::editMessageClicked);
+    QObject::connect(editMessageMenu, &EditMessageMenu::deleteClicked, this, &MainWindow::deleteMessageClicked);
+
     QObject::connect(&httpClient, &HttpClient::createGroupError, this, &MainWindow::createGroupError);
 
     QObject::connect(ui->messagesScrollArea->verticalScrollBar(), &QScrollBar::valueChanged, this, &MainWindow::messagesScrolled);
 }
 
-void MainWindow::fillPageNameToIndexMap()
-{
-    pageNameToIndexMap["signPage"] = 0;
-    pageNameToIndexMap["signInFormPage"] = 1;
-    pageNameToIndexMap["signUpFormPage"] = 2;
-    pageNameToIndexMap["homePage"] = 3;
-    pageNameToIndexMap["confirmEmailPage"] = 4;
-    pageNameToIndexMap["createGroupPage"] = 5;
+void MainWindow::hideEditMessageMenu() {
+    editMessageMenu->hide();
+}
+
+void MainWindow::editMessageClicked() {
+    editMessageMenu->hide();
+    messageOperationMode = "edit";
+    if (editedMessage) {
+        editedMessage->setStyleSheet(editedMessage->styleSheet() + "background-color: rgb(62, 105, 120);");
+    }
+    editedMessage = editMessageMenu->getTargetMessageWidget();
+    editedMessage->setStyleSheet(editedMessage->styleSheet() + "background-color: rgb(75, 80, 100);");
+    ui->messageLineEdit->setFixedWidth(1190); // show cancel button
+    ui->messageLineEdit->setText(editedMessage->getText());
+}
+
+void MainWindow::deleteMessageClicked() {
+    editMessageMenu->hide();
+    MessageWidget *target = editMessageMenu->getTargetMessageWidget();
+    int targetIndex = ui->messages->indexOf(target);
+    qlonglong tempId = static_cast<qlonglong>(QRandomGenerator::global()->generate64()); // temp id for the message
+    qlonglong targetMessageId = target->getId();
+    QJsonObject data;
+    data["method"] = "delete";
+    data["tempId"] = tempId;
+    data["targetMessageId"] = targetMessageId;
+    data["chatId"] = currentChatId;
+    data["toGroup"] = isCurrentChatGroup;
+    delete target;
+    if (targetIndex == ui->messages->count()) {
+        if (!ui->messages->isEmpty()) {
+            MessageWidget* prev = qobject_cast<MessageWidget*>(ui->messages->itemAt(ui->messages->count() - 1)->widget());
+            data["prevId"] = prev->getId(); // Other clients need to get data about prev. message when they get "delete" event
+            data["prevText"] = prev->getText();
+            data["prevSender"] = prev->getSender();
+            data["prevTime"] = prev->getTime();
+            updateChatsWithDeleteMessage(currentChatId, isCurrentChatGroup, targetMessageId, prev->getId(), prev->getText(), prev->getSender(), prev->getTime());
+        }
+        else {
+            updateChatsWithDeleteMessage(currentChatId, isCurrentChatGroup, targetMessageId);
+        }
+    }
+    emit sendMessage(data);
 }
 
 void MainWindow::clearChats() {
@@ -143,6 +183,10 @@ int MainWindow::calculateLineCount(const QString& text, const QFontMetrics& metr
 }
 
 void MainWindow::openChat() {
+    editMessageMenu->hide();
+    ui->messageLineEdit->setFixedWidth(1240);
+    messageOperationMode = "create";
+    ui->messageLineEdit->clear();
     clearMessages();
     atChat = true;
     isCurrentChatFullyLoaded = false;
@@ -160,50 +204,46 @@ void MainWindow::openChat() {
             : getMessages("messages/dialogue", body); // I didn't use emit keyword to use the ternary operator
 }
 
+ChatPushButton* MainWindow::createChatPushButton(qlonglong chatId, QString chatName, bool isChatGroup, qlonglong lastMessageId,
+                                                 QString lastMessageText, QString lastMessageSender, qlonglong lastMessageTime) {
+    QString lastMessageTimeStr = (QDateTime::fromMSecsSinceEpoch(lastMessageTime, Qt::UTC))
+                                     .toLocalTime().toString("dd.MM.yy, hh:mm");
+    int neededHeight = 60;
+    ChatPushButton* button = new ChatPushButton(chatId, chatName, isChatGroup, lastMessageId, lastMessageSender, lastMessageTime);
+    QLabel *nameLabel = new QLabel(button);
+    nameLabel->setStyleSheet("border: none;");
+    nameLabel->setText(chatName);
+    nameLabel->setGeometry(10, 10, 580, 40);
+
+    QLabel *lastMessageLabel = new QLabel(button);
+    lastMessageLabel->setObjectName("lastMessageLabel");
+    lastMessageLabel->setStyleSheet("font: 14pt \"Segoe UI\";"
+                                    "color: rgb(180, 180, 180);"
+                                    "border: none;");
+    lastMessageLabel->setGeometry(10, 60, 580, 60);
+
+    if (!lastMessageText.isEmpty()) {
+        neededHeight = 130;
+        QString lastMessageInfo = createLastMessageInfo(lastMessageText, lastMessageSender, lastMessageTime);
+        lastMessageLabel->setText(lastMessageInfo);
+    }
+
+    button->setStyleSheet("font: 16pt \"Segoe UI\";"
+                          "border-bottom: 1px solid rgb(180, 180, 180);");
+    button->setFixedSize(580, neededHeight);
+    QObject::connect(button, &QPushButton::clicked, this, &MainWindow::openChat);
+    return button;
+}
+
 void MainWindow::showChats(QJsonObject data) {
-    bool areChatsYours = data["your chats"].toBool();
     QString filter = data["filter"].toString();
+    bool areChatsYours = filter.isEmpty();
     QJsonArray arr = data["chats"].toArray();
     for (int i = 0; i < arr.size(); ++i) {
         QJsonObject object = arr[i].toObject();
-        qlonglong chatId = object["chatId"].toVariant().toLongLong();
-        QString name = object["chatName"].toString();
-        bool group = object["group"].toBool();
-        QString lastMessage = object["lastMessageText"].toString();
-        qlonglong lastMessageTimeAsLong = object["lastMessageTime"].toVariant().toLongLong();
-        QDateTime lastMessageTimeAsQDT = (QDateTime::fromMSecsSinceEpoch(lastMessageTimeAsLong, Qt::UTC)).toLocalTime();
-        QString lastMessageTime = lastMessageTimeAsQDT.toString("dd.MM.yy, hh:mm");
-        int neededHeight = 60; // The button height, px. Will be changed to 130 if chat has any messages to display as the last message
-
-        ChatPushButton *button = new ChatPushButton(chatId, name, group, this);
-
-        QLabel *nameLabel = new QLabel(button);
-        nameLabel->setStyleSheet("border: none;");
-        nameLabel->setText(name);
-        nameLabel->setGeometry(10, 10, 580, 40);
-
-        QLabel *lastMessageLabel = new QLabel(button);
-        lastMessageLabel->setObjectName("lastMessageLabel");
-        lastMessageLabel->setStyleSheet("font: 14pt \"Segoe UI\";"
-                                        "color: rgb(180, 180, 180);"
-                                        "border: none;");
-        lastMessageLabel->setGeometry(10, 60, 580, 60);
-
-        if (!lastMessage.isEmpty()) {
-            neededHeight = 130;
-            QString lastMessageSender = object["lastMessageSenderName"].toString();
-            QString lastMessageInfo = lastMessageSender + ": " + lastMessage.left(30);
-            if (lastMessage.size() > 30) {
-                lastMessageInfo += "...";
-            }
-            lastMessageInfo += "\n" + lastMessageTime;
-            lastMessageLabel->setText(lastMessageInfo);
-        }
-
-        button->setStyleSheet("font: 16pt \"Segoe UI\";"
-                                  "border-bottom: 1px solid rgb(180, 180, 180);");
-        button->setFixedSize(580, neededHeight);
-        QObject::connect(button, &QPushButton::pressed, this, &MainWindow::openChat);
+        ChatPushButton *button = createChatPushButton(object["chatId"].toInteger(), object["chatName"].toString(),
+                                                      object["group"].toBool(), object["messageId"].toInteger(),
+                                                      object["text"].toString(), object["senderName"].toString(), object["time"].toInteger());
         if (areChatsYours) {
             yourChats.append(button);
         }
@@ -213,75 +253,19 @@ void MainWindow::showChats(QJsonObject data) {
     }
 }
 
- // I know there are some repeats of the prev. method code, but it'll be hard to make a common logic so maybe I'll do it later
-void MainWindow::updateChatsWithMessage(qlonglong chatId, QString chatName, bool group, QString fullText) {
-    bool alreadyAtThisChat = false;
-    for (int i = 0; i < yourChats.length(); ++i) {
-        ChatPushButton *current = yourChats.at(i);
-        if (current->getId() == chatId) {
-            alreadyAtThisChat = true;
-            current->setFixedHeight(130);
-            current->findChild<QLabel*>("lastMessageLabel")->setText(fullText);
-            yourChats.push_back(current);
-            yourChats.remove(i);
-            if (ui->findUserLineEdit->text().isEmpty()) {
-                ui->chats->removeWidget(current);
-                ui->chats->insertWidget(0, current);
-            }
-            break;
-        }
-    }
-    if (!alreadyAtThisChat) {
-        ChatPushButton *button = new ChatPushButton(chatId, chatName, group, this);
-        QLabel *nameLabel = new QLabel(button);
-        nameLabel->setStyleSheet("border: none;");
-        nameLabel->setText(chatName);
-        nameLabel->setGeometry(10, 10, 580, 40);
-        QLabel *lastMessageLabel = new QLabel(button);
-        lastMessageLabel->setObjectName("lastMessageLabel");
-        lastMessageLabel->setStyleSheet("font: 14pt \"Segoe UI\";"
-                                        "color: rgb(180, 180, 180);"
-                                        "border: none;");
-        lastMessageLabel->setText(fullText);
-        lastMessageLabel->setGeometry(10, 60, 580, 60);
-        button->setStyleSheet("font: 16pt \"Segoe UI\";"
-                              "border-bottom: 1px solid rgb(180, 180, 180);");
-        button->setFixedSize(580, 130);
-        QObject::connect(button, &QPushButton::pressed, this, &MainWindow::openChat);
-        if (ui->findUserLineEdit->text().isEmpty()) {
-            ui->chats->insertWidget(0, button);
-        }
-        yourChats.append(button);
-    }
-}
-
 void MainWindow::groupCreated(QJsonObject data) {
     ui->groupNameLineEdit->clear();
     ui->createGroupWaitingLabel->movie()->stop();
     ui->createGroupWaitingLabel->hide();
     ui->createGroupButton->setEnabled(true);
 
-    qlonglong id = data["id"].toVariant().toLongLong();
+    qlonglong id = data["id"].toInteger();
     QString name = data["name"].toString();
-    ChatPushButton *button = new ChatPushButton(id, name, true, this);
-    QLabel *nameLabel = new QLabel(button);
-    QLabel *lastMessageLabel = new QLabel(button);
-    lastMessageLabel->setObjectName("lastMessageLabel");
-    lastMessageLabel->setStyleSheet("font: 14pt \"Segoe UI\";"
-                                    "color: rgb(180, 180, 180);"
-                                    "border: none;");
-    lastMessageLabel->setGeometry(10, 60, 580, 60);
-    nameLabel->setStyleSheet("border: none;");
-    nameLabel->setText(name);
-    nameLabel->setGeometry(10, 10, 580, 40);
-    button->setStyleSheet("font: 16pt \"Segoe UI\";"
-                          "border-bottom: 1px solid rgb(180, 180, 180);");
-    button->setFixedSize(580, 60);
-    QObject::connect(button, &QPushButton::pressed, this, &MainWindow::openChat);
-    yourChats.append(button);
+    ChatPushButton *button = createChatPushButton(id, name, true);
     if (ui->findUserLineEdit->text().isEmpty()) {
         ui->chats->addWidget(button);
     }
+    yourChats.append(button);
     on_createGroupGoBackButton_clicked(); // Return to the home page
 }
 
@@ -292,7 +276,7 @@ void MainWindow::messagesScrolled(int value) {
     if (isCurrentChatFullyLoaded) {
         return ;
     }
-    QLayoutItem *item = ui->messages->takeAt(0);
+    QLayoutItem *item = ui->messages->itemAt(0);
     if (item == nullptr) {
         return ;
     }
@@ -313,10 +297,23 @@ void MainWindow::messagesScrolled(int value) {
     ui->messagesScrollArea->verticalScrollBar()->setEnabled(false);
 }
 
+void MainWindow::messageRightClicked() { // notice that messages of other users don't get connected to this slot (createMessageWidget)
+    QObject *messageButtonAsObj = sender();
+    MessageWidget *message = dynamic_cast<MessageWidget*>(messageButtonAsObj);
+    if (message->isTemp()) {
+        return ;
+    }
+    int x = cursor().pos().x();
+    int y = cursor().pos().y();
+    editMessageMenu->setTargetMessageWidget(message);
+    editMessageMenu->move(x, y);
+    editMessageMenu->show();
+}
+
 void MainWindow::showMessages(QJsonObject data) {
-    qlonglong chatId = data["chatId"].toVariant().toLongLong();
+    qlonglong chatId = data["chatId"].toInteger();
     bool fromGroup = data["group"].toBool();
-    bool justOpened = data["just opened"].toBool();
+    bool justOpened = data["justOpened"].toBool();
     QJsonArray arr = data["messages"].toArray();
     if (chatId != currentChatId || fromGroup != isCurrentChatGroup) {
         return ; // The user came to the other chat, we don't need these messages now
@@ -330,7 +327,9 @@ void MainWindow::showMessages(QJsonObject data) {
 
     for (int i = 0; i < arr.size(); ++i) {
         QJsonObject object = arr[i].toObject();
-        addMessage(object);
+        MessageWidget* message = createMessageWidget(object["id"].toInteger(), object["text"].toString(), object["senderName"].toString(),
+                            object["time"].toInteger(), false);
+        ui->messages->insertWidget(0, message);
     }
     if (justOpened) {
         QTimer::singleShot(100, this, [=]() {
@@ -348,15 +347,10 @@ void MainWindow::showMessages(QJsonObject data) {
     ui->messagesScrollArea->verticalScrollBar()->setEnabled(true);
 }
 
-void MainWindow::addMessage(QJsonObject data) {
-    qlonglong id = data["id"].toVariant().toLongLong();
-    QString text = data["text"].toString();
-    QString sender = data["senderName"].toString();
-    bool isTemp = data["temp"].toBool();
+MessageWidget* MainWindow::createMessageWidget(qlonglong id, QString text, QString sender, qlonglong time, bool isTemp) {
     bool areYouSender = (sender == "You");
-    qlonglong timeAsLong = data["time"].toVariant().toLongLong();
-    QDateTime timeAsQDT = (QDateTime::fromMSecsSinceEpoch(timeAsLong, Qt::UTC)).toLocalTime();
-    QString time = timeAsQDT.toString("dd.MM.yy, hh:mm");
+    QString timeStr = (QDateTime::fromMSecsSinceEpoch(time, Qt::UTC))
+                                     .toLocalTime().toString("dd.MM.yy, hh:mm");
 
     QString backgroundColor = areYouSender
                                   ? "background-color: rgb(62, 105, 120);"
@@ -371,15 +365,16 @@ void MainWindow::addMessage(QJsonObject data) {
 
     int nameLabelWidth = mediumMetrics.horizontalAdvance(sender);
     int messageLabelWidth = messageMetrics.horizontalAdvance(text);
-    int timeLabelWidth = littleMetrics.horizontalAdvance(time);
-    int biggestElementWidth = max({messageLabelWidth, timeLabelWidth, nameLabelWidth}) + 20;
-    int containerWidth = min(800, biggestElementWidth);
+    int timeLabelWidth = littleMetrics.horizontalAdvance(timeStr);
+    int biggestElementWidth = std::max({messageLabelWidth, timeLabelWidth, nameLabelWidth}) + 20;
+    int containerWidth = std::min(800, biggestElementWidth);
 
-    MessageWidget *finalContainer = new MessageWidget(id, isTemp);
+    MessageWidget *finalContainer = new MessageWidget(id, isTemp, areYouSender, text, sender, time);
     finalContainer->setFixedWidth(containerWidth);
     finalContainer->setStyleSheet("font: 16pt \"Segoe UI\";"
                                   "border-radius: 10px;"
                                   + backgroundColor);
+    finalContainer->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
 
     QVBoxLayout *layout = new QVBoxLayout(finalContainer);
     layout->setSpacing(0);
@@ -390,22 +385,25 @@ void MainWindow::addMessage(QJsonObject data) {
     nameLabel->setStyleSheet("font: 14pt \"Segoe UI\"; color: rgb(188, 188, 225);");
 
     QLabel *messageLabel = new QLabel();
+    messageLabel->setObjectName("messageLabel");
     messageLabel->setWordWrap(true);
     messageLabel->setText(text);
+    messageLabel->setContextMenuPolicy(Qt::NoContextMenu);
     messageLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
 
     QLabel *timeLabel = new QLabel();
-    timeLabel->setText(time);
+    timeLabel->setText(timeStr);
     timeLabel->setStyleSheet("font: 12pt \"Segoe UI\"; color: rgb(180, 180, 180);");
 
     layout->addWidget(nameLabel);
     layout->addWidget(messageLabel);
     layout->addWidget(timeLabel);
 
-    data["add to the end"].toBool()
-            ? ui->messages->addWidget(finalContainer)
-            : ui->messages->insertWidget(0, finalContainer);
+    if (areYouSender) {
+        QObject::connect(finalContainer, &MessageWidget::clicked, this, &MainWindow::messageRightClicked);
+    }
 
+    return finalContainer;
 }
 
 void MainWindow::on_findUserLineEdit_textEdited(const QString &arg1)
@@ -423,41 +421,109 @@ void MainWindow::on_findUserLineEdit_textEdited(const QString &arg1)
     emit findChats(body);
 }
 
-void MainWindow::on_sendMessageButton_clicked()
+void MainWindow::on_sendMessageButton_clicked() // look for deletion of a message logic in the deleteMessageClicked method
 {
     QString text = ui->messageLineEdit->text();
     if (!atChat || text.isEmpty()) {
         return ;
     }
     ui->messageLineEdit->clear();
-    QDateTime utcDateTime = QDateTime::currentDateTimeUtc();
-    qlonglong msecs = utcDateTime.toMSecsSinceEpoch();
-    qlonglong tempId = static_cast<qlonglong>(QRandomGenerator::global()->generate64());
     QJsonObject data;
-    data["method"] = "create";
-    data["time"] = msecs;
-    data["text"] = text;
-    data["chatId"] = currentChatId;
-    data["toGroup"] = isCurrentChatGroup;
-    data["tempId"] = QString::number(tempId); // A string
-    emit sendMessage(data);
-    data.remove("tempId");
-    data["id"] = tempId; // A qlonglong
-    data["senderName"] = "You";
-    data["add to the end"] = true;
-    data["temp"] = true;
-    addMessage(data);
-    QTimer::singleShot(100, this, [=]() {
-        QScrollBar *bar = ui->messagesScrollArea->verticalScrollBar();
-        bar->setValue(bar->maximum());
-    });
-    if (text.size() > 30) {
-        text = text.left(30);
-        text.append("...");
+    data["method"] = messageOperationMode;
+    qlonglong tempId = static_cast<qlonglong>(QRandomGenerator::global()->generate64()); // temp id for the message
+    if (messageOperationMode == "create") {
+        QDateTime utcDateTime = QDateTime::currentDateTimeUtc();
+        qlonglong msecs = utcDateTime.toMSecsSinceEpoch();
+        data["time"] = msecs;
+        data["text"] = text;
+        data["chatId"] = currentChatId;
+        data["toGroup"] = isCurrentChatGroup;
+        data["tempId"] = tempId;
+        emit sendMessage(data);
+        ui->messages->addWidget(createMessageWidget(tempId, text, "You", msecs, true));
+        QTimer::singleShot(100, this, [=]() {
+            QScrollBar *bar = ui->messagesScrollArea->verticalScrollBar();
+            bar->setValue(bar->maximum());
+        });
+        updateChatsWithCreateMessage(currentChatId, currentChatName, isCurrentChatGroup, tempId, text, "You", msecs);
     }
-    QString time = QDateTime::currentDateTime().toString("dd.MM.yy, hh:mm");
-    QString newChatText = "You: " + text + '\n' + time;
-    updateChatsWithMessage(currentChatId, currentChatName, isCurrentChatGroup, newChatText);
+    if (messageOperationMode == "edit") {
+        data["text"] = text;
+        data["tempId"] = tempId;
+        data["chatId"] = currentChatId;
+        data["toGroup"] = isCurrentChatGroup;
+        data["targetMessageId"] = editedMessage->getId();
+        emit sendMessage(data);
+        ui->messageLineEdit->setFixedWidth(1240);
+        int targetIndex = ui->messages->indexOf(editedMessage);
+        MessageWidget* newMW = createMessageWidget(editedMessage->getId(), text,
+                                                   editedMessage->getSender(), editedMessage->getTime(), editedMessage->isTemp());
+        delete editedMessage;
+        ui->messages->insertWidget(targetIndex, newMW);
+        if (targetIndex == ui->messages->count() - 1) {
+            updateChatsWithEditMessage(currentChatId, isCurrentChatGroup, newMW->getId(), newMW->getText());
+        }
+    }
+    messageOperationMode = "create";
+}
+
+void MainWindow::messageReceived(QJsonObject data) {
+    QString method = data["method"].toString();
+    if (method == "create") {
+        qlonglong timeLong = data["time"].toInteger(); // some parameters are added on the server side
+        qlonglong id = data["id"].toInteger();
+        QString text = data["text"].toString();
+        bool toGroup = data["toGroup"].toBool();
+        qlonglong chatId = data["chatId"].toInteger();
+        QString chatName = data["chatName"].toString();
+        QString sender = data["senderName"].toString();
+        updateChatsWithCreateMessage(chatId, chatName, toGroup, id, text, sender, timeLong);
+        if (toGroup != isCurrentChatGroup || chatId != currentChatId) { // The user is in the other chat
+            // create a notification here
+            return ;
+        }
+        ui->messages->addWidget(createMessageWidget(id, text, sender, timeLong, false));
+        QTimer::singleShot(100, this, [=]() {
+            QScrollBar *bar = ui->messagesScrollArea->verticalScrollBar();
+            bar->setValue(bar->maximum());
+        });
+    }
+    if (method == "edit") {
+        QString text = data["text"].toString();
+        bool toGroup = data["toGroup"].toBool();
+        qlonglong chatId = data["chatId"].toInteger();
+        qlonglong targetMessageId = data["targetMessageId"].toInteger();
+        if (toGroup == isCurrentChatGroup && chatId == currentChatId) {
+            for (int i = 0; i < ui->messages->count(); ++i) {
+                MessageWidget* curr = qobject_cast<MessageWidget*>(ui->messages->itemAt(i)->widget());
+                if (targetMessageId == curr->getId()) {
+                    curr->setText(text);
+                    curr->findChild<QLabel*>("messageLabel")->setText(text);
+                    break;
+                }
+            }
+        }
+        updateChatsWithEditMessage(chatId, toGroup, targetMessageId, text);
+    }
+    if (method == "delete") {
+        qlonglong targetMessageId = data["targetMessageId"].toInteger();
+        bool toGroup = data["toGroup"].toBool();
+        qlonglong chatId = data["chatId"].toInteger();
+        qlonglong prevId = data["prevId"].toInteger();
+        QString prevText = data["prevText"].toString();
+        QString prevSender = data["prevSender"].toString();
+        qlonglong prevTime = data["prevTime"].toInteger();
+        if (toGroup == isCurrentChatGroup && chatId == currentChatId) {
+            for (int i = 0; i < ui->messages->count(); ++i) {
+                MessageWidget* curr = qobject_cast<MessageWidget*>(ui->messages->itemAt(i)->widget());
+                if (targetMessageId == curr->getId()) {
+                    delete curr;
+                    break;
+                }
+            }
+        }
+        updateChatsWithDeleteMessage(chatId, toGroup, targetMessageId, prevId, prevText, prevSender, prevTime);
+    }
 }
 
 void MainWindow::on_messageLineEdit_returnPressed()
@@ -465,48 +531,94 @@ void MainWindow::on_messageLineEdit_returnPressed()
     on_sendMessageButton_clicked();
 }
 
-void MainWindow::messageAcknowledged(QJsonObject data) {
-    for (int i = 0; i < ui->messages->count(); ++i) {
-        QLayoutItem* item = ui->messages->itemAt(i);
-        if (!item) continue;
-
-        QWidget* widget = item->widget();
-        if (widget) {
-            MessageWidget *messageWidget = qobject_cast<MessageWidget*>(widget);
-            if (messageWidget->isTemp() && messageWidget->getId() == data["tempId"].toVariant().toLongLong()) {
-                messageWidget->setTemp(false);
-                messageWidget->setId(data["newId"].toVariant().toLongLong());
-                break;
-            }
+ChatPushButton* MainWindow::findChatButton(qlonglong chatId, bool group) {
+    for (int i = 0; i < yourChats.length(); ++i) {
+        ChatPushButton *current = yourChats.at(i);
+        if (current->getId() == chatId && group == current->isGroup()) {
+            return current;
         }
+    }
+    return nullptr; // Button not found
+}
+
+void MainWindow::updateChatsWithCreateMessage(qlonglong chatId, QString chatName, bool group, qlonglong messageId, QString text, QString sender, qlonglong time) {
+    ChatPushButton *button = findChatButton(chatId, group);
+    if (button) {
+        button->setLastMessageId(messageId);
+        button->setLastMessageSenderName(sender);
+        button->setLastMessageTime(time);
+        button->setFixedHeight(130);
+        button->findChild<QLabel*>("lastMessageLabel")->setText(createLastMessageInfo(text, sender, time));
+        yourChats.push_back(button);
+        yourChats.removeOne(button);
+        if (ui->findUserLineEdit->text().isEmpty()) {
+            ui->chats->removeWidget(button);
+            ui->chats->insertWidget(0, button);
+        }
+    }
+    else {
+        button = createChatPushButton(chatId, chatName, group, messageId, text, sender, time);
+        if (ui->findUserLineEdit->text().isEmpty()) {
+            ui->chats->insertWidget(0, button);
+        }
+        yourChats.append(button);
     }
 }
 
-void MainWindow::messageReceived(QJsonObject data) {
-    qlonglong timeAsLong = data["time"].toVariant().toLongLong();
-    QDateTime timeAsQDT = (QDateTime::fromMSecsSinceEpoch(timeAsLong, Qt::UTC)).toLocalTime();
-    QString time = timeAsQDT.toString("dd.MM.yy, hh:mm");
-    QString text = data["text"].toString();
-    if (text.size() > 30) {
-        text = text.left(30);
-        text.append("...");
+void MainWindow::updateChatsWithEditMessage(qlonglong chatId, bool group, qlonglong editedMessageId, QString text) {
+    ChatPushButton *button = findChatButton(chatId, group);
+    if (button && editedMessageId == button->getLastMessageId()) {
+        button->findChild<QLabel*>("lastMessageLabel")->setText(createLastMessageInfo(text,
+                                                                                       button->getLastMessageSenderName(),
+                                                                                       button->getLastMessageTime()));
     }
-    bool toGroup = data["toGroup"].toBool();
-    qlonglong chatId = data["chatId"].toVariant().toLongLong();
-    QString chatName = data["chatName"].toString();
-    QString newChatText = data["senderName"].toString() + ": " + text + '\n' + time;
-    updateChatsWithMessage(chatId, chatName, toGroup, newChatText);
+}
 
-    if (toGroup != isCurrentChatGroup || chatId != currentChatId) { // The user is in the other chat
-        // create a notification here
-        return ;
+void MainWindow::updateChatsWithDeleteMessage(qlonglong chatId, bool group, qlonglong deletedMessageId,
+                                              qlonglong newMessageId, QString text, QString sender, qlonglong time) {
+    ChatPushButton *button = findChatButton(chatId, group);
+    if (button && deletedMessageId == button->getLastMessageId()) {
+        button->setLastMessageId(newMessageId);
+        button->setLastMessageSenderName(sender);
+        button->setLastMessageTime(time);
+        if (text.isEmpty()) {
+            button->setFixedHeight(60);
+        }
+        button->findChild<QLabel*>("lastMessageLabel")->setText(createLastMessageInfo(text, sender, time));
     }
-    data["add to the end"] = true;
-    addMessage(data);
-    QTimer::singleShot(100, this, [=]() {
-        QScrollBar *bar = ui->messagesScrollArea->verticalScrollBar();
-        bar->setValue(bar->maximum());
-    });
+}
+
+QString MainWindow::createLastMessageInfo(QString text, QString sender, qlonglong time) {
+    QString lastMessageTimeStr = (QDateTime::fromMSecsSinceEpoch(time, Qt::UTC))
+    .toLocalTime().toString("dd.MM.yy, hh:mm");
+    QString lastMessageInfo = sender + ": " + text.left(30);
+    if (text.size() > 30) {
+        lastMessageInfo += "...";
+    }
+    lastMessageInfo += "\n" + lastMessageTimeStr;
+    return lastMessageInfo;
+}
+
+void MainWindow::createMessageAcknowledged(QJsonObject data) {
+    qlonglong tempId = data["tempId"].toInteger();
+    qlonglong newId = data["newId"].toInteger();
+    qlonglong chatId = data["chatId"].toInteger();
+    bool toGroup = data["toGroup"].toBool();
+    for (int i = 0; i < ui->messages->count(); ++i) {
+        MessageWidget *messageWidget = qobject_cast<MessageWidget*>(ui->messages->itemAt(i)->widget());
+            if (messageWidget->isTemp() && messageWidget->getId() == tempId) {
+                messageWidget->setTemp(false);
+                messageWidget->setId(newId);
+                break;
+        }
+    }
+    for (int i = 0; i < ui->chats->count(); ++i) {
+        ChatPushButton *chat = qobject_cast<ChatPushButton*>(ui->chats->itemAt(i)->widget());
+        if (chat->getId() == chatId && chat->isGroup() == toGroup) {
+            chat->setLastMessageId(newId);
+            break;
+        }
+    }
 }
 
 void MainWindow::on_createGroupButton_clicked()
@@ -550,8 +662,8 @@ void MainWindow::createGroupError(QString error) {
 
 void MainWindow::on_createGroupGoBackButton_clicked()
 {
-    int index = pageNameToIndexMap["homePage"];
-    ui->stackedWidget->setCurrentIndex(index);
+
+    ui->stackedWidget->setPage("homePage");
 }
 
 void MainWindow::wsConnected() {
@@ -563,8 +675,7 @@ void MainWindow::wsDisconnected() {
 }
 
 void MainWindow::signProcessed() {
-    int homePageIndex = pageNameToIndexMap["homePage"];
-    ui->stackedWidget->setCurrentIndex(homePageIndex);
+    ui->stackedWidget->setPage("homePage");
 }
 
 void MainWindow::shouldConfirmEmail()
@@ -584,21 +695,19 @@ void MainWindow::shouldConfirmEmail()
         ui->signUpButton->setEnabled(true);
     }
     confirmEmailExpiredTimer.start();
-    int confirmEmailPageIndex = pageNameToIndexMap["confirmEmailPage"];
-    ui->stackedWidget->setCurrentIndex(confirmEmailPageIndex);
+    ui->stackedWidget->setPage("confirmEmailPage");
 }
 
 void MainWindow::confirmEmailExpired()
 {
     QString warning = "You didn't confirm your email!";
     if (authType == AuthorizationType::Login) {
-        int signInFormPageIndex = pageNameToIndexMap["signInFormPage"];
-        ui->stackedWidget->setCurrentIndex(signInFormPageIndex);
+
+        ui->stackedWidget->setPage("signInFormPage");
         displaySignInWarning(warning);
     }
     if (authType == AuthorizationType::Registration) {
-        int signUpFormPageIndex = pageNameToIndexMap["signUpFormPage"];
-        ui->stackedWidget->setCurrentIndex(signUpFormPageIndex);
+        ui->stackedWidget->setPage("signUpFormPage");
         displaySignUpWarning(warning);
     }
 }
@@ -622,12 +731,10 @@ void MainWindow::displaySignUpWarning(QString warning)
 }
 
 void MainWindow::unauthorized() {
-    int currentIndex = ui->stackedWidget->currentIndex();
-    int signPageIndex = pageNameToIndexMap["signPage"];
-    int signInFormPageIndex = pageNameToIndexMap["signInFormPage"];
-    int signUpFormPageIndex = pageNameToIndexMap["signUpFormPage"];
-    if (currentIndex != signPageIndex && currentIndex != signInFormPageIndex && currentIndex != signUpFormPageIndex) {
-        ui->stackedWidget->setCurrentIndex(signPageIndex);
+    editMessageMenu->hide();
+    QString currentPage = ui->stackedWidget->getCurrentPageName();
+    if (currentPage != "signPage" && currentPage != "signInFormPage" && currentPage != "signUpFormPage") {
+        ui->stackedWidget->setPage("signPage");
     }
 }
 
@@ -648,14 +755,12 @@ void MainWindow::signError(QString error) {
 
 void MainWindow::on_goToSignInButton_clicked()
 {
-    int signInFormPageIndex = pageNameToIndexMap["signInFormPage"];
-    ui->stackedWidget->setCurrentIndex(signInFormPageIndex);
+    ui->stackedWidget->setPage("signInFormPage");
 }
 
 void MainWindow::on_goToSignUpButton_clicked()
 {
-    int signUpFormPageIndex = pageNameToIndexMap["signUpFormPage"];
-    ui->stackedWidget->setCurrentIndex(signUpFormPageIndex);
+    ui->stackedWidget->setPage("signUpFormPage");
 }
 
 void MainWindow::on_signInButton_clicked()
@@ -728,18 +833,23 @@ void MainWindow::on_backToSignButton_clicked()
 
 void MainWindow::on_fromSignInToSignUpButton_clicked()
 {
-    int index = pageNameToIndexMap["signUpFormPage"];
-    ui->stackedWidget->setCurrentIndex(index);
+    ui->stackedWidget->setPage("signUpFormPage");
 }
 
 void MainWindow::on_fromSignUpToSignInButton_clicked()
 {
-    int index = pageNameToIndexMap["signInFormPage"];
-    ui->stackedWidget->setCurrentIndex(index);
+    ui->stackedWidget->setPage("signInFormPage");
 }
 
 void MainWindow::on_goToCreateGroupPageButton_clicked()
 {
-    int index = pageNameToIndexMap["createGroupPage"];
-    ui->stackedWidget->setCurrentIndex(index);
+    editMessageMenu->hide();
+    ui->stackedWidget->setPage("createGroupPage");
 }
+
+void MainWindow::on_cancelMessageEditButton_clicked()
+{
+    ui->messageLineEdit->setFixedWidth(1240);
+    messageOperationMode = "create";
+}
+

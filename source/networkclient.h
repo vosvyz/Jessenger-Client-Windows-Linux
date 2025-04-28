@@ -1,5 +1,4 @@
-#ifndef NETWORKCLIENT_H
-#define NETWORKCLIENT_H
+#pragma once
 
 #include <QObject>
 #include <QEventLoop>
@@ -26,5 +25,3 @@ protected:
     void refreshToken(QMap<QString, QString> body);
     QByteArray getParamsAsUrlUnencoded(QMap<QString, QString> params);
 };
-
-#endif // NETWORKCLIENT_H

@@ -56,21 +56,33 @@ void WsClient::connect() {
     });
 }
 
+void WsClient::removePendingMessage(qlonglong tempId) {
+    for (int i = 0; i < pendingMessages.size(); ++i) {
+        QJsonObject currentMessage = pendingMessages.at(i);
+        qlonglong currentMessageTempId = currentMessage["tempId"].toInteger();
+        if (currentMessageTempId == tempId) {
+            pendingMessages.remove(i);
+            break;
+        }
+    }
+}
+
 void WsClient::messageReceivedSlot(QString message) {
     QByteArray dataAsArray = message.toUtf8();
     QJsonDocument dataAsDocument = QJsonDocument::fromJson(dataAsArray);
     QJsonObject data = dataAsDocument.object();
-    if (data["method"] == "acknowledged") { // Acknowledged is set when the server processed the message
-        QString tempId = data["tempId"].toString();
-        for (int i = 0; i < pendingMessages.size(); ++i) {
-            QJsonObject currentMessage = pendingMessages.at(i);
-            QString currentMessageTempId = currentMessage["tempId"].toString();
-            if (currentMessageTempId == tempId) {
-                pendingMessages.remove(i);
-                break;
-            }
+    QString method = data["method"].toString();
+    qlonglong tempId = data["tempId"].toInteger();
+    if (method == "acknowledged") { // Acknowledged is set when the server processed the message
+        removePendingMessage(tempId);
+        QString initialMethod = data["initialMethod"].toString();
+        if (initialMethod == "create") {
+            emit createMessageAcknowledged(data);
         }
-        emit messageAcknowledged(data);
+    }
+    else if (method == "error") {
+        removePendingMessage(tempId);
+        emit messageError(data);
     }
     else {
         emit messageReceived(data);
